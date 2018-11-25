@@ -1,75 +1,84 @@
-public class CarOnRoundabout
+
+public class CarOnRoundabout implements Comparable<CarOnRoundabout>
 {
-	public Car carOnRoundabout;
+	public final Car carOnRoundabout;
 	public int indexOnRoundabout;
-	public int exitIndex;
-	public int maxIndex;
-	public Road exitRoad;
+	private final int exitIndex;
+	public final int maxIndex;
+	public final Road exitRoad;
 	public int failedAttempts = 0;
-	public boolean hasReconsidered = false;
-	public double currentSpeed = 0;
-	public Road enterRoad;
-	public CarOnRoundabout (Car a, int indexOnRoundabout, int exitIndex, Road exitRoad,int maxIndexOfRoundabout, Road enterRoad)
+	private double currentSpeed = 0;
+	
+	public CarOnRoundabout(Car a, int indexOnRoundabout, int exitIndex, Road exitRoad, int maxIndexOfRoundabout)
 	{
 		carOnRoundabout = a;
 		this.indexOnRoundabout = indexOnRoundabout;
 		this.exitIndex = exitIndex;
 		this.exitRoad = exitRoad;
 		this.maxIndex = maxIndexOfRoundabout;
-		this.enterRoad = enterRoad;
 	}
 	
-	public int workOutDistanceTillEnd(int currentIndex, int maxIndex, int exitIndex)
+	private int workOutDistanceTillEnd(int currentIndex, int maxIndex, int exitIndex)
 	{
-		if(currentIndex<exitIndex)
+		if(currentIndex < exitIndex)
 		{
-			return exitIndex-currentIndex;
+			return exitIndex - currentIndex;
 		}
 		else
 		{
-			return (maxIndex-currentIndex)+exitIndex;
+			return (maxIndex - currentIndex) + exitIndex;
 		}
 	}
+	
 	public void increaseIndex()
 	{
 		double oldSpeed = currentSpeed;
-		indexOnRoundabout = (indexOnRoundabout+1)%(maxIndex+1);
-		if(currentSpeed + (workOutDistanceTillEnd(indexOnRoundabout,maxIndex,exitIndex)*carOnRoundabout.getDeceleration()*Config.SIMACCELERATION)>0)
+		indexOnRoundabout = (indexOnRoundabout + 1) % (maxIndex + 1);
+		if(currentSpeed + (workOutDistanceTillEnd(indexOnRoundabout, maxIndex, exitIndex) * - Config.CARACCELERATIONANDDECELERATION * Config.SIMACCELERATION) > 0)
 		{
-			currentSpeed=currentSpeed+carOnRoundabout.getDeceleration()*Config.SIMACCELERATION;
+			currentSpeed = currentSpeed - Config.CARACCELERATIONANDDECELERATION * Config.SIMACCELERATION;
 		}
 		else
 		{
-			if(currentSpeed<13.4111944444)
+			if(currentSpeed < 13.4111944444)
 			{
-				currentSpeed=currentSpeed+carOnRoundabout.getAcceleration()*Config.SIMACCELERATION;
+				currentSpeed = currentSpeed - Config.CARACCELERATIONANDDECELERATION * Config.SIMACCELERATION;
 			}
-			if(currentSpeed>13.4111944444)
+			if(currentSpeed > 13.4111944444)
 			{
-				currentSpeed=13.4111944444;
+				currentSpeed = 13.4111944444;
 			}
 		}
-		carOnRoundabout.addToFuel(oldSpeed, currentSpeed);
+		carOnRoundabout.endOfTurnActivities(oldSpeed, currentSpeed);
 	}
 	
 	public boolean isWithinExitIndex()
 	{
-		if(indexOnRoundabout==exitIndex)
-		{
-				return true;
-		}
-		return false;
+		return indexOnRoundabout == exitIndex;
 	}
 	
 	public boolean addToFailedAttempts()
 	{
 		failedAttempts++;
-		if(failedAttempts>Config.ROUNDABOUTRECHOOSEAMOUNT)
+		if(failedAttempts > Config.ROUNDABOUTRECHOOSEAMOUNT)
 		{
-			failedAttempts=0;
+			failedAttempts = 0;
 			return true;
 		}
 		return false;
 	}
+	
+	@Override
+	public int compareTo(CarOnRoundabout o)
+	{
+		if(indexOnRoundabout > o.indexOnRoundabout)
+		{
+			return 1;
+		}
+		else if(indexOnRoundabout < o.indexOnRoundabout)
+		{
+			return - 1;
+		}
+		return 0;
+	}
 }
-

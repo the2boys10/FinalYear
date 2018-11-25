@@ -1,13 +1,44 @@
 
 public class GoalAndDistance
 {
-	public String goal = null;
-	public double distanceLeft = 0;
-	public double actualDistanceLeft = 0;
-	public GoalAndDistance(String goal, double distance, double actualDistanceLeft)
+	private String goal;
+	private double distanceLeft;
+	private double actualDistanceLeft;
+	
+	public GoalAndDistance()
+	{
+	
+	}
+	
+	public void setGoal(String goal)
 	{
 		this.goal = goal;
-		this.distanceLeft = distance;
+	}
+	
+	public void setDistanceLeft(double distanceLeft)
+	{
+		this.distanceLeft = distanceLeft;
+	}
+	
+	public void setAllAtOnce(String goal, double distanceLeft, double actualDistanceLeft)
+	{
+		this.goal = goal;
+		this.distanceLeft = distanceLeft;
 		this.actualDistanceLeft = actualDistanceLeft;
+	}
+	
+	public String getGoal()
+	{
+		return goal;
+	}
+	
+	public double getDistanceLeft()
+	{
+		return distanceLeft;
+	}
+	
+	public double getActualDistanceLeft()
+	{
+		return actualDistanceLeft;
 	}
 }

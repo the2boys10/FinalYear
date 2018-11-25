@@ -1,10 +1,10 @@
 
 public class PointOnRoad
 {
-	public Road specRoad;
-	public double xCord;
-	public double yCord;
-
+	public final Road specRoad;
+	public final double xCord;
+	public final double yCord;
+	
 	public PointOnRoad(Road c, double a, double b)
 	{
 		this.specRoad = c;
