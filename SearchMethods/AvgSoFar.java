@@ -1,3 +1,7 @@
+
+import java.util.LinkedList;
+import java.util.TreeSet;
+
 public class AvgSoFar extends SearchTechniques
 {
 	@Override
@@ -12,31 +16,31 @@ public class AvgSoFar extends SearchTechniques
 		searchStrategy(callingRoad, a, b, c, endRoad);
 	}
 	
-	public void searchStrategy(Road callingRoad, LinkedList<Road> a, TreeSet<RoadAndWeight> b, LinkedList<Road> c, Road endRoad)
+	private void searchStrategy(Road callingRoad, LinkedList<Road> a, TreeSet<RoadAndWeight> b, LinkedList<Road> c, Road endRoad)
 	{
-		while (0 < a.size())
+		while(0 < a.size( ))
 		{
-			Road temp = a.removeFirst();
-			if(temp.hasBeenChecked==false)
+			Road temp = a.removeFirst( );
+			if(! temp.hasBeenChecked)
 			{
-				RoadAndWeight connections = null;
-				double weightOfEdge = 0;
-				double weightOfNode = 0;
-				if(callingRoad.getAmountOfAvg()[callingRoad.getGoingTo().getIndex(callingRoad, temp)]>= Config.AMOUNTOUSEAVG)
-					weightOfNode = callingRoad.getAverageTimesOnIntersection()[callingRoad.getGoingTo().getIndex(callingRoad, temp)];
+				RoadAndWeight connections;
+				double weightOfEdge;
+				double weightOfNode;
+				if(callingRoad.getAmountOfAvg( )[callingRoad.getGoingTo( ).getIndex(callingRoad, temp)] >= Config.AMOUNTOUSEAVG)
+					weightOfNode = callingRoad.getAverageTimesOnIntersection( )[callingRoad.getGoingTo( ).getIndex(callingRoad, temp)];
 				else
-					weightOfNode = callingRoad.getWeightOfRoad()[callingRoad.getGoingTo().getIndex(callingRoad, temp)];
-				if(temp.getAmountOfAvg()[0]>Config.AMOUNTOUSEAVG)
-					weightOfEdge = temp.getAverageTimesOnIntersection()[0];
+					weightOfNode = callingRoad.getWeightOfRoad( )[callingRoad.getGoingTo( ).getIndex(callingRoad, temp)];
+				if(temp.getAmountOfAvg( )[0] > Config.AMOUNTOUSEAVG)
+					weightOfEdge = temp.getAverageTimesOnIntersection( )[0];
 				else
-					weightOfEdge = temp.getWeightOfRoad()[0];
-				connections = new RoadAndWeight(temp,weightOfNode+weightOfEdge).addFirstChosen(temp);
+					weightOfEdge = temp.getWeightOfRoad( )[0];
+				connections = new RoadAndWeight(temp, weightOfNode + weightOfEdge).addFirstChosen(temp);
 				b.add(connections);
-				connections.amountOfCarsOnJourney = connections.amountOfCarsOnJourney+temp.getCarsOnRoad().size();
+				connections.amountOfCarsOnJourney = connections.amountOfCarsOnJourney + temp.getCarsOnRoad( ).size( );
 				c.add(temp);
-				if(endRoad!=temp)
+				if(endRoad != temp)
 				{
-					temp.hasBeenChecked=true;
+					temp.hasBeenChecked = true;
 				}
 			}
 		}

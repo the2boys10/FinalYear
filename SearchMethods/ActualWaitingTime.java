@@ -1,3 +1,4 @@
+
 import java.util.LinkedList;
 import java.util.TreeSet;
 
@@ -7,29 +8,29 @@ public class ActualWaitingTime extends SearchTechniques
 	@Override
 	public void selectWeightStrategyInit(Road callingRoad, LinkedList<Road> a, TreeSet<RoadAndWeight> b, LinkedList<Road> c, Road endRoad)
 	{
-		while (0 < a.size())
+		while(0 < a.size( ))
 		{
-			Road temp = a.removeFirst();
-			if(temp.hasBeenChecked==false)
+			Road temp = a.removeFirst( );
+			if(! temp.hasBeenChecked)
 			{
-				RoadAndWeight connections = null;
-				double weightOfEdge = 0;
-				double weightOfNode = 0;
-				if(callingRoad.getAmountOfAvg()[callingRoad.getGoingTo().getIndex(callingRoad, temp)]>= Config.AMOUNTOUSEAVG)
-					weightOfNode = callingRoad.getAverageTimesOnIntersection()[callingRoad.getGoingTo().getIndex(callingRoad, temp)];
+				RoadAndWeight connections;
+				double weightOfEdge;
+				double weightOfNode;
+				if(callingRoad.getAmountOfAvg( )[callingRoad.getGoingTo( ).getIndex(callingRoad, temp)] >= Config.AMOUNTOUSEAVG)
+					weightOfNode = callingRoad.getAverageTimesOnIntersection( )[callingRoad.getGoingTo( ).getIndex(callingRoad, temp)];
 				else
-					weightOfNode = callingRoad.getWeightOfRoad()[callingRoad.getGoingTo().getIndex(callingRoad, temp)];
-				if(temp.getAmountOfAvg()[0]>Config.AMOUNTOUSEAVG)
-					weightOfEdge = temp.getAverageTimesOnIntersection()[0];
+					weightOfNode = callingRoad.getWeightOfRoad( )[callingRoad.getGoingTo( ).getIndex(callingRoad, temp)];
+				if(temp.getAmountOfAvg( )[0] > Config.AMOUNTOUSEAVG)
+					weightOfEdge = temp.getAverageTimesOnIntersection( )[0];
 				else
-					weightOfEdge = temp.getWeightOfRoad()[0];
-				connections = new RoadAndWeight(temp,weightOfNode+weightOfEdge).addFirstChosen(temp);
+					weightOfEdge = temp.getWeightOfRoad( )[0];
+				connections = new RoadAndWeight(temp, weightOfNode + weightOfEdge).addFirstChosen(temp);
 				b.add(connections);
-				connections.amountOfCarsOnJourney = connections.amountOfCarsOnJourney+temp.getCarsOnRoad().size();
+				connections.amountOfCarsOnJourney = connections.amountOfCarsOnJourney + temp.getCarsOnRoad( ).size( );
 				c.add(temp);
-				if(endRoad!=temp)
+				if(endRoad != temp)
 				{
-					temp.hasBeenChecked=true;
+					temp.hasBeenChecked = true;
 				}
 			}
 		}
@@ -38,49 +39,47 @@ public class ActualWaitingTime extends SearchTechniques
 	@Override
 	public void selectWeightStrategyAfterInit(Road callingRoad, LinkedList<Road> a, TreeSet<RoadAndWeight> b, LinkedList<Road> c, Road firstChosen, double weight, Road endRoad, int amountOfCarsSoFar)
 	{
-		while (0 < a.size())
+		while(0 < a.size( ))
 		{
 			double weightOfEdge = 0;
 			double weightOfNode = 0;
-			RoadAndWeight connections = null;
-			Road temp = a.removeFirst();
-			if(temp.hasBeenChecked==false)
+			RoadAndWeight connections;
+			Road temp = a.removeFirst( );
+			if(! temp.hasBeenChecked)
 			{
 				boolean isCrossRoads = false;
-				if(callingRoad.getGoingTo().getClass().equals(CrossRoads.class))
+				if(callingRoad.getGoingTo( ).getClass( ).equals(CrossRoads.class))
 				{
 					isCrossRoads = true;
-					int indexOfCallingRoad = callingRoad.getGoingTo().getIndexOfRoadIncoming(callingRoad);
-					CrossRoads temp2 = (CrossRoads)callingRoad.getGoingTo();
-					if(temp2.getHowManyAcceptedDuringIntervalMax()[indexOfCallingRoad]>0)
+					int indexOfCallingRoad = callingRoad.getGoingTo( ).getIndexOfRoadIncoming(callingRoad);
+					CrossRoads temp2 = (CrossRoads) callingRoad.getGoingTo( );
+					if(temp2.getHowManyAcceptedDuringIntervalMax( )[indexOfCallingRoad] > 0)
 					{
-						double weightOfEdgeCalling = callingRoad.getWeightOfRoad()[0];
-						int amountOfCarsOnRoadCurrently = callingRoad.getCarsOnRoad().size();
-						int howManyAccepted = temp2.getHowManyAcceptedDuringIntervalMax()[indexOfCallingRoad];
+						double weightOfEdgeCalling = callingRoad.getWeightOfRoad( )[0];
+						int amountOfCarsOnRoadCurrently = callingRoad.getCarsOnRoad( ).size( );
+						int howManyAccepted = temp2.getHowManyAcceptedDuringIntervalMax( )[indexOfCallingRoad];
 						int howLongTillAccepting = temp2.howLongTillAcceptingState(callingRoad);
-						int trafficLightInterval = temp2.getInterval();
-						double howLongForEachVehicle = trafficLightInterval/howManyAccepted;
-						int howManyIntervalsWating = (int)Math.floor(amountOfCarsOnRoadCurrently/howManyAccepted);
-						int howLongInAddition = howManyIntervalsWating*trafficLightInterval;
-						double howLongForVehicleWaitingIfTrafficLightAlwaysAccepting = (amountOfCarsOnRoadCurrently + 1)*howLongForEachVehicle;
+						int trafficLightInterval = temp2.getInterval( );
+						double howLongForEachVehicle = (double) trafficLightInterval / (double) howManyAccepted;
+						double howLongForVehicleWaitingIfTrafficLightAlwaysAccepting = (amountOfCarsOnRoadCurrently + 1) * howLongForEachVehicle;
 						double overAllTimeToPassEdgeAndIntersection = howLongForVehicleWaitingIfTrafficLightAlwaysAccepting + weightOfEdgeCalling;
 						int howLongAcceptingFor = temp2.howLongTillStopAccepting(callingRoad);
-						if(howLongTillAccepting==0)
+						if(howLongTillAccepting == 0)
 						{
-							if(howLongAcceptingFor<overAllTimeToPassEdgeAndIntersection)
+							if(howLongAcceptingFor < overAllTimeToPassEdgeAndIntersection)
 							{
 								overAllTimeToPassEdgeAndIntersection = overAllTimeToPassEdgeAndIntersection - howLongAcceptingFor;
-								int amountOfSkippedIntervals = (int)Math.ceil(overAllTimeToPassEdgeAndIntersection%trafficLightInterval);
-								weightOfNode = howLongAcceptingFor+(amountOfSkippedIntervals*trafficLightInterval);
+								int amountOfSkippedIntervals = (int) Math.ceil(overAllTimeToPassEdgeAndIntersection % trafficLightInterval);
+								weightOfNode = howLongAcceptingFor + (amountOfSkippedIntervals * trafficLightInterval);
 							}
 						}
 						else
 						{
-							if(howLongTillAccepting<overAllTimeToPassEdgeAndIntersection)
+							if(howLongTillAccepting < overAllTimeToPassEdgeAndIntersection)
 							{
 								overAllTimeToPassEdgeAndIntersection = overAllTimeToPassEdgeAndIntersection - howLongTillAccepting;
-								int amountOfSkippedIntervals = (int)Math.ceil((overAllTimeToPassEdgeAndIntersection-trafficLightInterval)%trafficLightInterval);
-								weightOfNode = howLongTillAccepting+(amountOfSkippedIntervals*trafficLightInterval);
+								int amountOfSkippedIntervals = (int) Math.ceil((overAllTimeToPassEdgeAndIntersection - trafficLightInterval) % trafficLightInterval);
+								weightOfNode = howLongTillAccepting + (amountOfSkippedIntervals * trafficLightInterval);
 							}
 							else
 							{
@@ -93,24 +92,24 @@ public class ActualWaitingTime extends SearchTechniques
 						isCrossRoads = false;
 					}
 				}
-				if(isCrossRoads==false)
+				if(! isCrossRoads)
 				{
-					if(callingRoad.getAmountOfAvg()[callingRoad.getGoingTo().getIndex(callingRoad, temp)]>=Config.AMOUNTOUSEAVG)
-						weightOfNode = callingRoad.getAverageTimesOnIntersection()[callingRoad.getGoingTo().getIndex(callingRoad, temp)];
+					if(callingRoad.getAmountOfAvg( )[callingRoad.getGoingTo( ).getIndex(callingRoad, temp)] >= Config.AMOUNTOUSEAVG)
+						weightOfNode = callingRoad.getAverageTimesOnIntersection( )[callingRoad.getGoingTo( ).getIndex(callingRoad, temp)];
 					else
-						weightOfNode = callingRoad.getWeightOfRoad()[callingRoad.getGoingTo().getIndex(callingRoad, temp)];
-					if(temp.getAmountOfAvg()[0]>Config.AMOUNTOUSEAVG)
-						weightOfEdge = temp.getAverageTimesOnIntersection()[0];
+						weightOfNode = callingRoad.getWeightOfRoad( )[callingRoad.getGoingTo( ).getIndex(callingRoad, temp)];
+					if(temp.getAmountOfAvg( )[0] > Config.AMOUNTOUSEAVG)
+						weightOfEdge = temp.getAverageTimesOnIntersection( )[0];
 					else
-						weightOfEdge = temp.getWeightOfRoad()[0];
+						weightOfEdge = temp.getWeightOfRoad( )[0];
 				}
-				connections = new RoadAndWeight(temp,weightOfNode+weightOfEdge+weight).addFirstChosen(firstChosen);
+				connections = new RoadAndWeight(temp, weightOfNode + weightOfEdge + weight).addFirstChosen(firstChosen);
 				b.add(connections);
-				connections.amountOfCarsOnJourney = amountOfCarsSoFar+temp.getCarsOnRoad().size();
+				connections.amountOfCarsOnJourney = amountOfCarsSoFar + temp.getCarsOnRoad( ).size( );
 				c.add(temp);
-				if(endRoad!=temp)
+				if(endRoad != temp)
 				{
-					temp.hasBeenChecked=true;
+					temp.hasBeenChecked = true;
 				}
 			}
 		}
