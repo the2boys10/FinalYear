@@ -1,18 +1,6 @@
+package com.company.Other;
 
-import java.awt.geom.Line2D;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.Random;
-import java.util.Scanner;
-import java.util.TreeSet;
-
+import com.company.Intersections.*;
 import org.graphstream.graph.Edge;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
@@ -27,15 +15,22 @@ import org.graphstream.ui.layout.springbox.implementations.SpringBox;
 import org.graphstream.ui.spriteManager.Sprite;
 import org.graphstream.ui.spriteManager.SpriteManager;
 import org.graphstream.ui.view.Viewer;
-// histogram on population based on distance / time or whatever he chose as his
-public class FinalYear 
+
+import java.awt.geom.Line2D;
+import java.io.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
+
+
+class FinalYear
 {
 	private static int lastCarAdded = 0;
 	private static boolean initialization = true;
-	private static String nodesConfig = System.getProperty("user.dir");
-	private static String roadsConfig = System.getProperty("user.dir");
-	private static String carsConfig = System.getProperty("user.dir");
-	private static String prefixConfig = "\\1cp"+Config.TIMEBETWEENEACHADDITION;
+	private static final String nodesConfig = System.getProperty("user.dir");
+	private static final String roadsConfig = System.getProperty("user.dir");
+	private static final String carsConfig = System.getProperty("user.dir");
+	private static String prefixConfig = "/" + Config.ALGORITHM + "/1cp" + Config.TIMEBETWEENEACHADDITION;
 	private static int currentRunthrough = 1;
 	private static AppendToFile nodeFile;
 	private static AppendToFile roadFile;
@@ -44,14 +39,13 @@ public class FinalYear
 	private static int[][] connectionInfo;
 	private static final boolean debug = true;
 	private static Graph graph;
-	private static BarnesHutLayout layout = new SpringBox();
 	private static Viewer viewer;
 	private static double[][] anglesBetweenNodes;
 	private static double[][] distances;
 	private static IntersectionAbstract[] intersectionList;
-	public static Road[] roadsInSystem;
+	private static Road[] roadsInSystem;
 	private static double[][] speedOfRoads;
-	private static LinkedList<Car> cars = new LinkedList<Car>();
+	private static final LinkedList<Car> cars = new LinkedList<Car>( );
 	private static SpriteManager sman;
 	private static int amountOfCarsAddedSoFar = 0;
 	private static double sumOfAllRoadLengths;
@@ -66,7 +60,7 @@ public class FinalYear
 	private static AppendToFile fuelUsedWhileDecelerating;
 	private static AppendToFile fuelUsedWhileIdle;
 	private static AppendToFile fuelUsedWhileConstant;
-	public static AppendToFile errorFile;
+	private static AppendToFile errorFile;
 	private static BigDecimal TotalFuelUsedByFinishedVehicles = new BigDecimal(0);
 	private static BigDecimal AverageTimeToGetToDestination = new BigDecimal(0);
 	private static double amountOfCarsFinished = 0;
@@ -76,326 +70,332 @@ public class FinalYear
 	private static AppendToFile averageSpeedAtTimestep;
 	private static AppendToFile overAllStats;
 	private static int timestep = 0;
-	private static boolean simulationStuck = false;
-	private static StringBuilder carOutput = new StringBuilder();
+	private static final StringBuilder carOutput = new StringBuilder( );
 	
 	
-	
-	public static void main(String[] args) 
+	public static void main(String[] args)
 	{
-//		while(Config.ALGORITHM<=8)
-//		{
-			while(Config.TIMEBETWEENEACHADDITION>=8)
+		//				while(Config.ALGORITHM<=8)
+		//				{
+		UserInputFile.initialiseSearchStrategy( );
+		while(Config.TIMEBETWEENEACHADDITION >= 50)
+		{
+			for(currentRunthrough = 1; currentRunthrough <= Config.HOWMANYRUNS; currentRunthrough++)
 			{
-				for (currentRunthrough = 1; currentRunthrough <= Config.HOWMANYRUNS; currentRunthrough++) 
+				startTracking = false;
+				initialization = true;
+				cleanData( );
+				prepareOutputFiles( );
+				createGraph( );
+				createNodes( );
+				createRoads( );
+				workOutAngles( );
+				createObjectMap( );
+				createCars( );
+				sortOutWeightsInitialization( );
+				initialization = false;
+				setTimestep(0);
+				while(getTimestep( ) < Config.HOWLONGTORUNFOR * 10 + (1000))
 				{
-					startTracking = false;
-					initialization = true;
-					cleanData();
-					prepareOutputFiles();
-					createGraph();
-					createNodes();
-					createRoads();
-					workOutAngles();
-					createObjectMap();
-					simulationStuck=false;
-					createCars();
-					sortOutWeightsInitialization();
-					initialization = false;
-					setTimestep(0);
-					while(getTimestep()<Config.HOWLONGTORUNFOR*10+(1000)&&simulationStuck==false)
+					moveCars( );
+					setTimestep(getTimestep( ) + 1);
+					if(getTimestep( ) % Config.TIMEBETWEENEACHADDITION * 10 == 0 && getTimestep( ) != 0)
 					{
-						moveCars();
-						setTimestep(getTimestep() + 1);
-						if(getTimestep()%Config.TIMEBETWEENEACHADDITION*10==0&&getTimestep()!=0)
+						createCars( );
+					}
+					if(getTimestep( ) % Config.REFRESHRATE == 0)
+					{
+						for(Car car : cars)
 						{
-							createCars();	
+							car.getCarsSprite( ).setPosition(car.getCurrentX( ), car.getCurrentY( ), 0);
 						}
-						if(getTimestep()%Config.REFRESHRATE==0)
+					}
+					if(getTimestep( ) % 3000 == 0)
+					{
+						if(Config.RANDOMCARS || Config.RANDOMINTERSECTIONS || Config.RANDOMROADS)
 						{
-							for (int j = 0; j < cars.size(); j++) 
+							if(carFile != null)
 							{
-								cars.get(j).getCarsSprite().setPosition(cars.get(j).getCurrentX(), cars.get(j).getCurrentY(), 0);
+								carFile.appendToFile(carOutput);
 							}
-						}
-						if(getTimestep()%3000==0)
-						{
-							if(Config.RANDOMCARS||Config.RANDOMINTERSECTIONS||Config.RANDOMROADS)
+							else
 							{
-								if(carFile != null)
-								{
-									carFile.appendToFile(carOutput);
-								}
-								else
-								{
-									carFile.openWriterAppend();
-									carFile.appendToFile(carOutput);
-								}
-								carOutput.setLength(0);
+								carFile.openWriterAppend( );
+								carFile.appendToFile(carOutput);
 							}
-						}
-						if(getTimestep()==Config.BURNINPERIOD)
-						{
-							startTracking=true;
+							carOutput.setLength(0);
 						}
 					}
-					for (int j = 0; j < cars.size(); j++) 
+					if(getTimestep( ) == Config.BURNINPERIOD)
 					{
-						cars.get(j).getCarsSprite().setPosition(cars.get(j).getCurrentX(), cars.get(j).getCurrentY(), 0);
+						startTracking = true;
 					}
-					FileSinkImages pic = new FileSinkImages(OutputType.JPG, Resolutions.HD1080);
-					pic.setLayoutPolicy(LayoutPolicy.NO_LAYOUT);
-					viewer.disableAutoLayout();
-					try {
-						Thread.sleep(500);
-					} catch (InterruptedException e1) {
-						// TODO Auto-generated catch block
-						e1.printStackTrace();
-					}
-					try 
-					{
-						pic.writeAll(viewer.getGraphicGraph(), System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\Test"+currentRunthrough+".jpg");
-					} 
-					catch (IOException e) 
-					{
-						e.printStackTrace();
-					}
-					if(Config.RANDOMCARS||Config.RANDOMINTERSECTIONS||Config.RANDOMROADS)
-					{
-						if(carFile != null)
-						{
-							carFile.appendToFile(carOutput);
-						}
-						else
-						{
-							carFile.openWriterAppend();
-							carFile.appendToFile(carOutput);
-						}
-						carOutput.setLength(0);
-					}
-					viewer.close();
-					pushData();
 				}
-				new File(System.getProperty("user.dir")+prefixConfig+"\\testMeans").mkdir();
-				double[] meanData = new double[4];
-				for (currentRunthrough = 1; currentRunthrough <= Config.HOWMANYRUNS; currentRunthrough++) 
+				for(Car car : cars)
 				{
-					ReadFile temp = new ReadFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\overAllStats\\overAllStats.tsv");
-					String[] lines = temp.OpenFile();
-					meanData[0] = ((meanData[0]*(currentRunthrough-1))+(Double.parseDouble(lines[1].split("=")[1])))/(currentRunthrough);
-					meanData[1] = ((meanData[1]*(currentRunthrough-1))+(Double.parseDouble(lines[2].split("=")[1])))/(currentRunthrough);
-					meanData[2] = ((meanData[2]*(currentRunthrough-1))+(Double.parseDouble(lines[3].split("=")[1])))/(currentRunthrough);
-					meanData[3] = ((meanData[3]*(currentRunthrough-1))+(Double.parseDouble(lines[4].split("=")[1])))/(currentRunthrough);
+					car.getCarsSprite( ).setPosition(car.getCurrentX( ), car.getCurrentY( ), 0);
 				}
-				AppendToFile means = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\testMeans\\meanDataOnAlgorithm.tsv");
-				means.cleanFile();
-				means.openWriterAppend();
-				means.appendToFile(new StringBuilder().append("#MeanData\nMean of how many = " + (currentRunthrough-1) + "\nTotal fuel consumed by finished cars="+meanData[0]+"\nAverage time taken to get to destination="+meanData[1]+"\nGlobal Throughput ="+meanData[2]+"\nAverage fuel usage of cars ="+meanData[3]));
-				means.closeWriterAppend();
-				Config.TIMEBETWEENEACHADDITION--;
-				Config.TIMEBETWEENEACHADDITION--;
-				prefixConfig = "\\1cp"+Config.TIMEBETWEENEACHADDITION;
+				FileSinkImages pic = new FileSinkImages(OutputType.JPG, Resolutions.HD1080);
+				pic.setLayoutPolicy(LayoutPolicy.NO_LAYOUT);
+				viewer.disableAutoLayout( );
+				try
+				{
+					Thread.sleep(500);
+				}
+				catch(InterruptedException e1)
+				{
+					e1.printStackTrace( );
+				}
+				try
+				{
+					pic.writeAll(viewer.getGraphicGraph( ), System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/Test" + currentRunthrough + ".jpg");
+				}
+				catch(IOException e)
+				{
+					e.printStackTrace( );
+				}
+				if(Config.RANDOMCARS || Config.RANDOMINTERSECTIONS || Config.RANDOMROADS)
+				{
+					if(carFile != null)
+					{
+						carFile.appendToFile(carOutput);
+					}
+					else
+					{
+						carFile.openWriterAppend( );
+						carFile.appendToFile(carOutput);
+					}
+					carOutput.setLength(0);
+				}
+				viewer.close( );
+				pushData( );
 			}
-//			Config.ALGORITHM++;
-//			Config.TIMEBETWEENEACHADDITION = 50;
-//			prefixConfig = "\\"+Config.ALGORITHM+"\\1cp"+Config.TIMEBETWEENEACHADDITION;
-//		}
+			new File(System.getProperty("user.dir") + prefixConfig + "/testMeans").mkdir( );
+			new File(System.getProperty("user.dir") + prefixConfig).mkdir( );
+			double[] meanData = new double[4];
+			for(currentRunthrough = 1; currentRunthrough <= Config.HOWMANYRUNS; currentRunthrough++)
+			{
+				ReadFile temp = new ReadFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/overAllStats/overAllStats.tsv");
+				String[] lines = temp.OpenFile( );
+				meanData[0] = ((meanData[0] * (currentRunthrough - 1)) + (Double.parseDouble(lines[1].split("=")[1]))) / (currentRunthrough);
+				meanData[1] = ((meanData[1] * (currentRunthrough - 1)) + (Double.parseDouble(lines[2].split("=")[1]))) / (currentRunthrough);
+				meanData[2] = ((meanData[2] * (currentRunthrough - 1)) + (Double.parseDouble(lines[3].split("=")[1]))) / (currentRunthrough);
+				meanData[3] = ((meanData[3] * (currentRunthrough - 1)) + (Double.parseDouble(lines[4].split("=")[1]))) / (currentRunthrough);
+			}
+			AppendToFile means = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/testMeans/meanDataOnAlgorithm.tsv");
+			means.cleanFile( );
+			means.openWriterAppend( );
+			means.appendToFile(new StringBuilder( ).append("#MeanData\nMean of how many = ").append(currentRunthrough - 1).append("\nTotal fuel consumed by finished cars=").append(meanData[0]).append("\nAverage time taken to get to destination=").append(meanData[1]).append("\nGlobal Throughput =").append(meanData[2]).append("\nAverage fuel usage of cars =").append(meanData[3]));
+			means.closeWriterAppend( );
+			Config.TIMEBETWEENEACHADDITION--;
+			Config.TIMEBETWEENEACHADDITION--;
+			prefixConfig = "/1cp" + Config.TIMEBETWEENEACHADDITION;
+		}
+		//					Config.ALGORITHM++;
+		//					Config.TIMEBETWEENEACHADDITION = 50;
+		//					prefixConfig = "/"+Config.ALGORITHM+"/1cp"+Config.TIMEBETWEENEACHADDITION;
+		//				}
 	}
 	
 	private static void prepareOutputFiles()
 	{
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough).mkdir();
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs").mkdir();
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\RatioIdleTimeAndOverallTime").mkdir();
-		outputRatioIdleAndOverall = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\RatioIdleTimeAndOverallTime\\RatioIdleTimeAndOverallTime.tsv");
-		outputRatioIdleAndOverall.cleanFile();
-		outputRatioIdleAndOverall.openWriterAppend();
-		outputRatioIdleAndOverall.appendToFile(new StringBuilder().append("#RatioIdleTimeAndOverallTime"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\RatioTimeTakenAndDistance").mkdir();
-		outputRatioTimeAndDistance = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\RatioTimeTakenAndDistance\\RatioTimeTakenAndDistance.tsv");
-		outputRatioTimeAndDistance.cleanFile();
-		outputRatioTimeAndDistance.openWriterAppend();
-		outputRatioTimeAndDistance.appendToFile(new StringBuilder().append("#RatioTimeTakenAndDistance"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\IdleTime").mkdir();
-		idleTimeOnFinish = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\IdleTime\\IdleTime.tsv");
-		idleTimeOnFinish.cleanFile();
-		idleTimeOnFinish.openWriterAppend();
-		idleTimeOnFinish.appendToFile(new StringBuilder().append("#IdleTime"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeTakenToReachDestination").mkdir();
-		timeTakenToReachDestination = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeTakenToReachDestination\\timeTakenToReachDestination.tsv");
-		timeTakenToReachDestination.cleanFile();
-		timeTakenToReachDestination.openWriterAppend();
-		timeTakenToReachDestination.appendToFile(new StringBuilder().append("timeTakenToReachDestination"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeAccelerating").mkdir();
-		timeAccelerating = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeAccelerating\\timeAccelerating.tsv");
-		timeAccelerating.cleanFile();
-		timeAccelerating.openWriterAppend();
-		timeAccelerating.appendToFile(new StringBuilder().append("#timeAccelerating"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeDecelerating").mkdir();
-		timeDecelerating = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeDecelerating\\timeDecelerating.tsv");
-		timeDecelerating.cleanFile();
-		timeDecelerating.openWriterAppend();
-		timeDecelerating.appendToFile(new StringBuilder().append("#timeDecelerating"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeConstant").mkdir();
-		timeConstant = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeConstant\\timeConstant.tsv");
-		timeConstant.cleanFile();
-		timeConstant.openWriterAppend();
-		timeConstant.appendToFile(new StringBuilder().append("#timeConstant"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileAccelerating").mkdir();
-		fuelUsedWhileAccelerating = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileAccelerating\\fuelUsedWhileAccelerating.tsv");
-		fuelUsedWhileAccelerating.cleanFile();
-		fuelUsedWhileAccelerating.openWriterAppend();
-		fuelUsedWhileAccelerating.appendToFile(new StringBuilder().append("#fuelUsedWhileAccelerating"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileDecelerating").mkdir();
-		fuelUsedWhileDecelerating = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileDecelerating\\fuelUsedWhileDecelerating.tsv");
-		fuelUsedWhileDecelerating.cleanFile();
-		fuelUsedWhileDecelerating.openWriterAppend();
-		fuelUsedWhileDecelerating.appendToFile(new StringBuilder().append("#fuelUsedWhileDecelerating"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileIdle").mkdir();
-		fuelUsedWhileIdle = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileIdle\\fuelUsedWhileIdle.tsv");
-		fuelUsedWhileIdle.cleanFile();
-		fuelUsedWhileIdle.openWriterAppend();
-		fuelUsedWhileIdle.appendToFile(new StringBuilder().append("#fuelUsedWhileIdle"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileConstant").mkdir();
-		fuelUsedWhileConstant = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileConstant\\fuelUsedWhileConstant.tsv");
-		fuelUsedWhileConstant.cleanFile();
-		fuelUsedWhileConstant.openWriterAppend();
-		fuelUsedWhileConstant.appendToFile(new StringBuilder().append("#fuelUsedWhileConstant"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\totalFuelUsed").mkdir();
-		totalFuelUsed = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\totalFuelUsed\\totalFuelUsed.tsv");
-		totalFuelUsed.cleanFile();
-		totalFuelUsed.openWriterAppend();
-		totalFuelUsed.appendToFile(new StringBuilder().append("#totalFuelUsed"));
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\averageSpeedAtTimestep").mkdir();
-		averageSpeedAtTimestep = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\averageSpeedAtTimestep\\averageSpeedAtTimestep.tsv");
-		averageSpeedAtTimestep.cleanFile();
-		averageSpeedAtTimestep.openWriterAppend();
-		averageSpeedAtTimestep.appendToFile(new StringBuilder().append("#averageSpeedAtTimestep"));
-		errorFile = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\error.txt");
-		errorFile.cleanFile();
-		errorFile.openWriterAppend();
-		new File(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\overAllStats").mkdir();
-		overAllStats = new AppendToFile(System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\overAllStats\\overAllStats.tsv");
-		overAllStats.cleanFile();
-		overAllStats.openWriterAppend();
-		overAllStats.appendToFile(new StringBuilder().append("#overAllStats"));
+		new File(System.getProperty("user.dir") + "/" + Config.ALGORITHM).mkdir( );
+		new File(System.getProperty("user.dir") + prefixConfig).mkdir( );
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough).mkdir( );
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs").mkdir( );
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/RatioIdleTimeAndOverallTime").mkdir( );
+		outputRatioIdleAndOverall = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/RatioIdleTimeAndOverallTime/RatioIdleTimeAndOverallTime.tsv");
+		outputRatioIdleAndOverall.cleanFile( );
+		outputRatioIdleAndOverall.openWriterAppend( );
+		outputRatioIdleAndOverall.appendToFile(new StringBuilder( ).append("#RatioIdleTimeAndOverallTime"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/RatioTimeTakenAndDistance").mkdir( );
+		outputRatioTimeAndDistance = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/RatioTimeTakenAndDistance/RatioTimeTakenAndDistance.tsv");
+		outputRatioTimeAndDistance.cleanFile( );
+		outputRatioTimeAndDistance.openWriterAppend( );
+		outputRatioTimeAndDistance.appendToFile(new StringBuilder( ).append("#RatioTimeTakenAndDistance"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/IdleTime").mkdir( );
+		idleTimeOnFinish = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/IdleTime/IdleTime.tsv");
+		idleTimeOnFinish.cleanFile( );
+		idleTimeOnFinish.openWriterAppend( );
+		idleTimeOnFinish.appendToFile(new StringBuilder( ).append("#IdleTime"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/timeTakenToReachDestination").mkdir( );
+		timeTakenToReachDestination = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/timeTakenToReachDestination/timeTakenToReachDestination.tsv");
+		timeTakenToReachDestination.cleanFile( );
+		timeTakenToReachDestination.openWriterAppend( );
+		timeTakenToReachDestination.appendToFile(new StringBuilder( ).append("timeTakenToReachDestination"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/timeAccelerating").mkdir( );
+		timeAccelerating = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/timeAccelerating/timeAccelerating.tsv");
+		timeAccelerating.cleanFile( );
+		timeAccelerating.openWriterAppend( );
+		timeAccelerating.appendToFile(new StringBuilder( ).append("#timeAccelerating"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/timeDecelerating").mkdir( );
+		timeDecelerating = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/timeDecelerating/timeDecelerating.tsv");
+		timeDecelerating.cleanFile( );
+		timeDecelerating.openWriterAppend( );
+		timeDecelerating.appendToFile(new StringBuilder( ).append("#timeDecelerating"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/timeConstant").mkdir( );
+		timeConstant = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/timeConstant/timeConstant.tsv");
+		timeConstant.cleanFile( );
+		timeConstant.openWriterAppend( );
+		timeConstant.appendToFile(new StringBuilder( ).append("#timeConstant"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/fuelUsedWhileAccelerating").mkdir( );
+		fuelUsedWhileAccelerating = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/fuelUsedWhileAccelerating/fuelUsedWhileAccelerating.tsv");
+		fuelUsedWhileAccelerating.cleanFile( );
+		fuelUsedWhileAccelerating.openWriterAppend( );
+		fuelUsedWhileAccelerating.appendToFile(new StringBuilder( ).append("#fuelUsedWhileAccelerating"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/fuelUsedWhileDecelerating").mkdir( );
+		fuelUsedWhileDecelerating = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/fuelUsedWhileDecelerating/fuelUsedWhileDecelerating.tsv");
+		fuelUsedWhileDecelerating.cleanFile( );
+		fuelUsedWhileDecelerating.openWriterAppend( );
+		fuelUsedWhileDecelerating.appendToFile(new StringBuilder( ).append("#fuelUsedWhileDecelerating"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/fuelUsedWhileIdle").mkdir( );
+		fuelUsedWhileIdle = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/fuelUsedWhileIdle/fuelUsedWhileIdle.tsv");
+		fuelUsedWhileIdle.cleanFile( );
+		fuelUsedWhileIdle.openWriterAppend( );
+		fuelUsedWhileIdle.appendToFile(new StringBuilder( ).append("#fuelUsedWhileIdle"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/fuelUsedWhileConstant").mkdir( );
+		fuelUsedWhileConstant = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/fuelUsedWhileConstant/fuelUsedWhileConstant.tsv");
+		fuelUsedWhileConstant.cleanFile( );
+		fuelUsedWhileConstant.openWriterAppend( );
+		fuelUsedWhileConstant.appendToFile(new StringBuilder( ).append("#fuelUsedWhileConstant"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/totalFuelUsed").mkdir( );
+		totalFuelUsed = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/totalFuelUsed/totalFuelUsed.tsv");
+		totalFuelUsed.cleanFile( );
+		totalFuelUsed.openWriterAppend( );
+		totalFuelUsed.appendToFile(new StringBuilder( ).append("#totalFuelUsed"));
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/averageSpeedAtTimestep").mkdir( );
+		averageSpeedAtTimestep = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/averageSpeedAtTimestep/averageSpeedAtTimestep.tsv");
+		averageSpeedAtTimestep.cleanFile( );
+		averageSpeedAtTimestep.openWriterAppend( );
+		averageSpeedAtTimestep.appendToFile(new StringBuilder( ).append("#averageSpeedAtTimestep"));
+		errorFile = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/error.txt");
+		errorFile.cleanFile( );
+		errorFile.openWriterAppend( );
+		new File(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/overAllStats").mkdir( );
+		overAllStats = new AppendToFile(System.getProperty("user.dir") + prefixConfig + "/test" + currentRunthrough + "/graphs/overAllStats/overAllStats.tsv");
+		overAllStats.cleanFile( );
+		overAllStats.openWriterAppend( );
+		overAllStats.appendToFile(new StringBuilder( ).append("#overAllStats"));
 	}
 	
-	private static void pushData() 
+	private static void pushData()
 	{
 		if(carFile != null)
 		{
-			carFile.closeWriterAppend();
+			carFile.closeWriterAppend( );
 		}
-		overAllStats.appendToFile(new StringBuilder().append("\nTotal Fuel Consumed By Finished Cars=" + TotalFuelUsedByFinishedVehicles.doubleValue()+"\nAverage time taken to get to destination=" + AverageTimeToGetToDestination.doubleValue() + "\nGlobal throughput=" + (amountOfCarsFinished/amountOfCarsAddedSoFar)+"\nAverage fuel used by finished vehicles =" + TotalFuelUsedByFinishedVehicles.divide(new BigDecimal(amountOfCarsFinished),50, RoundingMode.HALF_EVEN).doubleValue()));
-		overAllStats.closeWriterAppend();
-		outputRatioIdleAndOverall.closeWriterAppend();
-		outputRatioTimeAndDistance.closeWriterAppend();
-		idleTimeOnFinish.closeWriterAppend();
-		timeAccelerating.closeWriterAppend();
-		timeDecelerating.closeWriterAppend();
-		timeConstant.closeWriterAppend();
-		fuelUsedWhileAccelerating.closeWriterAppend();
-		fuelUsedWhileDecelerating.closeWriterAppend();
-		fuelUsedWhileIdle.closeWriterAppend();
-		fuelUsedWhileConstant.closeWriterAppend();
-		timeTakenToReachDestination.closeWriterAppend();
-		totalFuelUsed.closeWriterAppend();
-		averageSpeedAtTimestep.closeWriterAppend();
-		errorFile.closeWriterAppend();
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set xrange [0:1];set yzeroaxis;set boxwidth 0.005 absolute;set style fill solid 1.0 noborder;bin_width = 0.0005;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\RatioIdleTimeAndOverallTime\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\RatioIdleTimeAndOverallTime\\RatioIdleTimeAndOverallTime.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set boxwidth 0.005 absolute;set style fill solid 1.0 noborder;bin_width = 0.005;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\RatioTimeTakenAndDistance\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\RatioTimeTakenAndDistance\\RatioTimeTakenAndDistance.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set boxwidth 0.05 absolute;set style fill solid 1.0 noborder;bin_width = 10;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\IdleTime\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\IdleTime\\IdleTime.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set boxwidth 0.05 absolute;set style fill solid 1.0 noborder;bin_width = 50;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeTakenToReachDestination\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeTakenToReachDestination\\timeTakenToReachDestination.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set boxwidth 0.05 absolute;set style fill solid 1.0 noborder;bin_width = 20;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeAccelerating\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeAccelerating\\timeAccelerating.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set boxwidth 0.05 absolute;set style fill solid 1.0 noborder;bin_width = 20;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeDecelerating\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeDecelerating\\timeDecelerating.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set boxwidth 0.05 absolute;set style fill solid 1.0 noborder;bin_width = 20;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeConstant\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\timeConstant\\timeConstant.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set xrange [0:];set boxwidth 0.00001 absolute;set style fill solid 1.0 noborder;bin_width = 0.001;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileAccelerating\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileAccelerating\\fuelUsedWhileAccelerating.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set xrange [0:];set boxwidth 0.00001 absolute;set style fill solid 1.0 noborder;bin_width = 0.001;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileDecelerating\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileDecelerating\\fuelUsedWhileDecelerating.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set xrange [0:];set boxwidth 0.00001 absolute;set style fill solid 1.0 noborder;bin_width = 0.0001;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileIdle\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileIdle\\fuelUsedWhileIdle.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set xrange [0:];set boxwidth 0.001 absolute;set style fill solid 1.0 noborder;bin_width = 0.001;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileConstant\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\fuelUsedWhileConstant\\fuelUsedWhileConstant.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set xrange [0:];set boxwidth 0.001 absolute;set style fill solid 1.0 noborder;bin_width = 0.005;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\totalFuelUsed\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\totalFuelUsed\\totalFuelUsed.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
-           });
-		createGraph(new String[]{"C:\\Program Files\\gnuplot\\bin\\gnuplot",
-            "-e",
-            "reset;set key off;set terminal png size 1000,300;set yrange [0:];set xrange [1000:];set term png;set output '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\averageSpeedAtTimestep\\xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"\\test"+currentRunthrough+"\\graphs\\averageSpeedAtTimestep\\averageSpeedAtTimestep.tsv' with lines"
-           });
+		overAllStats.appendToFile(new StringBuilder( ).append("\nTotal Fuel Consumed By Finished Cars=").append(TotalFuelUsedByFinishedVehicles.doubleValue( )).append("\nAverage time taken to get to destination=").append(AverageTimeToGetToDestination.doubleValue( )).append("\nGlobal throughput=").append(amountOfCarsFinished / amountOfCarsAddedSoFar).append("\nAverage fuel used by finished vehicles =").append(TotalFuelUsedByFinishedVehicles.divide(new BigDecimal(amountOfCarsFinished), 50, RoundingMode.HALF_EVEN).doubleValue( )));
+		overAllStats.closeWriterAppend( );
+		outputRatioIdleAndOverall.closeWriterAppend( );
+		outputRatioTimeAndDistance.closeWriterAppend( );
+		idleTimeOnFinish.closeWriterAppend( );
+		timeAccelerating.closeWriterAppend( );
+		timeDecelerating.closeWriterAppend( );
+		timeConstant.closeWriterAppend( );
+		fuelUsedWhileAccelerating.closeWriterAppend( );
+		fuelUsedWhileDecelerating.closeWriterAppend( );
+		fuelUsedWhileIdle.closeWriterAppend( );
+		fuelUsedWhileConstant.closeWriterAppend( );
+		timeTakenToReachDestination.closeWriterAppend( );
+		totalFuelUsed.closeWriterAppend( );
+		averageSpeedAtTimestep.closeWriterAppend( );
+		errorFile.closeWriterAppend( );
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set xrange [0:1];set yzeroaxis;set boxwidth 0.005 absolute;set style fill solid 1.0 noborder;bin_width = 0.0005;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/RatioIdleTimeAndOverallTime/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/RatioIdleTimeAndOverallTime/RatioIdleTimeAndOverallTime.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set boxwidth 0.005 absolute;set style fill solid 1.0 noborder;bin_width = 0.005;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/RatioTimeTakenAndDistance/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/RatioTimeTakenAndDistance/RatioTimeTakenAndDistance.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set boxwidth 0.05 absolute;set style fill solid 1.0 noborder;bin_width = 10;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/IdleTime/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/IdleTime/IdleTime.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set boxwidth 0.05 absolute;set style fill solid 1.0 noborder;bin_width = 50;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/timeTakenToReachDestination/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/timeTakenToReachDestination/timeTakenToReachDestination.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set boxwidth 0.05 absolute;set style fill solid 1.0 noborder;bin_width = 20;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/timeAccelerating/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/timeAccelerating/timeAccelerating.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set boxwidth 0.05 absolute;set style fill solid 1.0 noborder;bin_width = 20;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/timeDecelerating/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/timeDecelerating/timeDecelerating.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set boxwidth 0.05 absolute;set style fill solid 1.0 noborder;bin_width = 20;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/timeConstant/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/timeConstant/timeConstant.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set xrange [0:];set boxwidth 0.00001 absolute;set style fill solid 1.0 noborder;bin_width = 0.001;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/fuelUsedWhileAccelerating/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/fuelUsedWhileAccelerating/fuelUsedWhileAccelerating.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set xrange [0:];set boxwidth 0.00001 absolute;set style fill solid 1.0 noborder;bin_width = 0.001;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/fuelUsedWhileDecelerating/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/fuelUsedWhileDecelerating/fuelUsedWhileDecelerating.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set xrange [0:];set boxwidth 0.00001 absolute;set style fill solid 1.0 noborder;bin_width = 0.0001;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/fuelUsedWhileIdle/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/fuelUsedWhileIdle/fuelUsedWhileIdle.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set xrange [0:];set boxwidth 0.001 absolute;set style fill solid 1.0 noborder;bin_width = 0.001;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/fuelUsedWhileConstant/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/fuelUsedWhileConstant/fuelUsedWhileConstant.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set border 3;set yzeroaxis;set yrange [0:];set xrange [0:];set boxwidth 0.001 absolute;set style fill solid 1.0 noborder;bin_width = 0.005;bin_number(x) = floor(x/bin_width);rounded(x) = bin_width * ( bin_number(x) + 0.5 );set term png;set terminal png size 1000,300;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/totalFuelUsed/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/totalFuelUsed/totalFuelUsed.tsv' using (rounded($1)):(1) smooth frequency with boxes;"
+		//           });
+		//		createGraph(new String[]{"C:/Program Files/gnuplot/bin/gnuplot",
+		//            "-e",
+		//            "reset;set key off;set terminal png size 1000,300;set yrange [0:];set xrange [1000:];set term png;set output '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/averageSpeedAtTimestep/xyz.png';plot '"+System.getProperty("user.dir")+prefixConfig+"/test"+currentRunthrough+"/graphs/averageSpeedAtTimestep/averageSpeedAtTimestep.tsv' with lines"
+		//           });
 	}
 	
 	private static void createGraph(String[] s)
 	{
-		try {
-		    Runtime rt = Runtime.getRuntime();
-		    Process proc = rt.exec(s);
-		    InputStream stdin = proc.getErrorStream();
-		    InputStreamReader isr = new InputStreamReader(stdin);
-		    BufferedReader br = new BufferedReader(isr);
-		    String line = null;
-		    while ((line = br.readLine()) != null)
-		        System.err.println("gnuplot:"+line);
-		    proc.getInputStream().close();
-		    proc.getOutputStream().close();
-		    proc.getErrorStream().close();
-		} catch (Exception e) {
-		    System.err.println("Fail: " + e);
+		try
+		{
+			Runtime rt = Runtime.getRuntime( );
+			Process proc = rt.exec(s);
+			InputStream stdin = proc.getErrorStream( );
+			InputStreamReader isr = new InputStreamReader(stdin);
+			BufferedReader br = new BufferedReader(isr);
+			String line;
+			while((line = br.readLine( )) != null)
+				System.err.println("gnuplot:" + line);
+			proc.getInputStream( ).close( );
+			proc.getOutputStream( ).close( );
+			proc.getErrorStream( ).close( );
+		}
+		catch(Exception e)
+		{
+			System.err.println("Fail: " + e);
 		}
 	}
-
+	
 	private static void addToDataAtCarFinish(Car carFinished)
 	{
-		String carsId = carFinished.getCarsSprite().getId();
-		outputRatioIdleAndOverall.appendToFile(new StringBuilder().append("\n"+ ((double)carFinished.timeIdle/(double)carFinished.timeTakenToGetToDestination) + " " + carsId));
-		outputRatioTimeAndDistance.appendToFile(new StringBuilder().append("\n"+ ((double)carFinished.timeTakenToGetToDestination/(double)carFinished.distanceTravelledSoFar.doubleValue()) + " " + carsId));
-		idleTimeOnFinish.appendToFile(new StringBuilder().append("\n"+ carFinished.timeIdle + " " + carsId));
-		timeTakenToReachDestination.appendToFile(new StringBuilder().append("\n"+ carFinished.timeTakenToGetToDestination + " " + carsId));
-		timeAccelerating.appendToFile(new StringBuilder().append("\n"+carFinished.timeTakenAccelerating + " " + carsId));
-		timeDecelerating.appendToFile(new StringBuilder().append("\n"+carFinished.timeTakenDecelerating + " " + carsId));
-		timeConstant.appendToFile(new StringBuilder().append("\n"+carFinished.timeTakenConstant + " " + carsId));
-		fuelUsedWhileAccelerating.appendToFile(new StringBuilder().append("\n"+carFinished.fuelUsedSoFarAccelerating.doubleValue() + " " + carsId));
-		fuelUsedWhileDecelerating.appendToFile(new StringBuilder().append("\n"+carFinished.fuelUsedSoFarDecelerating.doubleValue() + " " + carsId));
-		fuelUsedWhileIdle.appendToFile(new StringBuilder().append("\n"+carFinished.fuelUsedSoFarIdle.doubleValue() + " " + carsId));
-		fuelUsedWhileConstant.appendToFile(new StringBuilder().append("\n"+carFinished.fuelUsedSoFarConstant.doubleValue() + " " + carsId));
-		BigDecimal totalFuelUsedCumalative = carFinished.fuelUsedSoFarAccelerating.add(carFinished.fuelUsedSoFarDecelerating).add(carFinished.fuelUsedSoFarIdle).add(carFinished.fuelUsedSoFarConstant); 
-		totalFuelUsed.appendToFile(new StringBuilder().append("\n "+totalFuelUsedCumalative.doubleValue() + " " + carsId));
+		String carsId = carFinished.getCarsSprite( ).getId( );
+		outputRatioIdleAndOverall.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getTimeIdle( ) / carFinished.getFuelDepandant( ).getTimeTakenToGetToDestination( )).append(" ").append(carsId));
+		outputRatioTimeAndDistance.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getTimeTakenToGetToDestination( ) / carFinished.getFuelDepandant( ).getDistanceTravelledSoFar( ).doubleValue( )).append(" ").append(carsId));
+		idleTimeOnFinish.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getTimeIdle( )).append(" ").append(carsId));
+		timeTakenToReachDestination.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getTimeTakenToGetToDestination( )).append(" ").append(carsId));
+		timeAccelerating.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getTimeTakenAccelerating( )).append(" ").append(carsId));
+		timeDecelerating.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getTimeTakenDecelerating( )).append(" ").append(carsId));
+		timeConstant.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getTimeTakenConstant( )).append(" ").append(carsId));
+		fuelUsedWhileAccelerating.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getFuelUsedSoFarAccelerating( ).doubleValue( )).append(" ").append(carsId));
+		fuelUsedWhileDecelerating.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getFuelUsedSoFarDecelerating( ).doubleValue( )).append(" ").append(carsId));
+		fuelUsedWhileIdle.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getFuelUsedSoFarIdle( ).doubleValue( )).append(" ").append(carsId));
+		fuelUsedWhileConstant.appendToFile(new StringBuilder( ).append("\n").append(carFinished.getFuelDepandant( ).getFuelUsedSoFarConstant( ).doubleValue( )).append(" ").append(carsId));
+		BigDecimal totalFuelUsedCumalative = carFinished.getFuelDepandant( ).getFuelUsedSoFarAccelerating( ).add(carFinished.getFuelDepandant( ).getFuelUsedSoFarDecelerating( )).add(carFinished.getFuelDepandant( ).getFuelUsedSoFarIdle( )).add(carFinished.getFuelDepandant( ).getFuelUsedSoFarConstant( ));
+		totalFuelUsed.appendToFile(new StringBuilder( ).append("\n ").append(totalFuelUsedCumalative.doubleValue( )).append(" ").append(carsId));
 		TotalFuelUsedByFinishedVehicles = TotalFuelUsedByFinishedVehicles.add(totalFuelUsedCumalative);
-		AverageTimeToGetToDestination = (AverageTimeToGetToDestination.multiply(new BigDecimal(amountOfCarsFinished)).add(new BigDecimal(carFinished.timeTakenToGetToDestination))).divide(new BigDecimal(amountOfCarsFinished+1),50, RoundingMode.HALF_EVEN);
+		AverageTimeToGetToDestination = (AverageTimeToGetToDestination.multiply(new BigDecimal(amountOfCarsFinished)).add(new BigDecimal(carFinished.getFuelDepandant( ).getTimeTakenToGetToDestination( )))).divide(new BigDecimal(amountOfCarsFinished + 1), 50, RoundingMode.HALF_EVEN);
 		amountOfCarsFinished++;
 	}
 	
@@ -407,7 +407,7 @@ public class FinalYear
 		intersectionList = null;
 		roadsInSystem = null;
 		speedOfRoads = null;
-		cars.clear();
+		cars.clear( );
 		connectionInfo = null;
 		nodeInfoStored = null;
 		sumOfAllRoadLengths = 0;
@@ -432,110 +432,116 @@ public class FinalYear
 		amountOfCarsAddedSoFar = 0;
 	}
 	
-	@SuppressWarnings("unused")
-	private static void createCars() {
-		if (Config.RANDOMROADS || Config.RANDOMINTERSECTIONS || Config.RANDOMCARS) 
+	private static void createCars()
+	{
+		if(Config.RANDOMROADS || Config.RANDOMINTERSECTIONS || Config.RANDOMCARS)
 		{
-			if(carFile==null)
+			if(carFile == null)
 			{
-				carFile = new AppendToFile(carsConfig+prefixConfig+"\\test"+currentRunthrough+"\\cars.txt");
+				carFile = new AppendToFile(carsConfig + prefixConfig + "/test" + currentRunthrough + "/cars.txt");
 			}
-			if(initialization==true)
+			if(initialization)
 			{
-				carFile.cleanFile();
+				carFile.cleanFile( );
 			}
-			createCarsRandom();
-		} 
-		else 
+			createCarsRandom( );
+		}
+		else
 		{
-			createCarsConfigUserInput();
-			createCarsConfigIndex();
+			createCarsConfigUserInput( );
+			createCarsConfigIndex( );
 		}
 	}
-
-	public static void moveCars() 
+	
+	private static void moveCars()
 	{
-		LinkedList<Road> carsWhichFailedToMove = new LinkedList<Road>();
-		for (int i = 0; i < intersectionList.length; i++) 
+		LinkedList<Road> carsWhichFailedToMove = new LinkedList<Road>( );
+		for(IntersectionAbstract anIntersectionList : intersectionList)
 		{
-			intersectionList[i].continueInterval();
+			anIntersectionList.continueInterval( );
 		}
-		for (int i = 0; i < roadsInSystem.length; i++) 
+		for(Road temp : roadsInSystem)
 		{
-			Road temp = roadsInSystem[i];
-			for (int j = 0; j < temp.getCarsOnRoad().size(); j++) 
+			for(int j = 0; j < temp.getCarsOnRoad( ).size( ); j++)
 			{
-				String returnValue = temp.getCarsOnRoad().get(j).moveCar(false);
-				if (returnValue.equals("Finished")) 
+				String returnValue = temp.getCarsOnRoad( ).get(j).moveCar(false);
+				if(returnValue.equals("Finished"))
 				{
-					Car currentCar = temp.getCarsOnRoad().remove(j);
+					Car currentCar = temp.getCarsOnRoad( ).remove(j);
 					if(Config.REASKUSERTOCHANGEONFINISH)
 					{
-						UserInputFile.weightsOfEdgesAfterInitialization(currentCar, currentCar.getCurrentRoad(), "CarFinished");
+						UserInputFile.weightsOfEdgesAfterInitialization(currentCar, currentCar.getCurrentRoad( ), "CarFinished");
 					}
-					currentCar.getCurrentRoad().removeFrom(currentCar);
+					currentCar.getCurrentRoad( ).removeFrom(currentCar);
 					cars.remove(currentCar);
-					sman.removeSprite(currentCar.getCarsSprite().getId());
+					sman.removeSprite(currentCar.getCarsSprite( ).getId( ));
 					j--;
-					if(FinalYear.startTracking==true)
+					if(FinalYear.startTracking)
 					{
 						addToDataAtCarFinish(currentCar);
 					}
-				} 
-				else if (returnValue.equals("Failed to Move")) 
+				}
+				else if(returnValue.equals("Failed to Move"))
 				{
-					carsWhichFailedToMove.add(roadsInSystem[i]);
+					carsWhichFailedToMove.add(temp);
 					break;
 				}
 			}
 		}
-		while (Car.anyChange == true) 
+		while(Car.isAnyChange( ))
 		{
-			Car.anyChange = false;
-			for (int i = 0; i < carsWhichFailedToMove.size(); i++) {
+			Car.setAnyChange(false);
+			for(int i = 0; i < carsWhichFailedToMove.size( ); i++)
+			{
 				Road temp = carsWhichFailedToMove.get(i);
-				for (int j = 0; j < temp.getCarsOnRoad().size(); j++) {
-					String returnValue = temp.getCarsOnRoad().get(j).moveCar(false);
-					if (returnValue.equals("Finished")) 
+				for(int j = 0; j < temp.getCarsOnRoad( ).size( ); j++)
+				{
+					String returnValue = temp.getCarsOnRoad( ).get(j).moveCar(false);
+					if(returnValue.equals("Finished"))
 					{
-						Car currentCar = temp.getCarsOnRoad().remove(j);
+						Car currentCar = temp.getCarsOnRoad( ).remove(j);
 						if(Config.REASKUSERTOCHANGEONFINISH)
 						{
-							UserInputFile.weightsOfEdgesAfterInitialization(currentCar, currentCar.getCurrentRoad(), "CarFinished");
+							UserInputFile.weightsOfEdgesAfterInitialization(currentCar, currentCar.getCurrentRoad( ), "CarFinished");
 						}
-						currentCar.getCurrentRoad().removeFrom(currentCar);
+						currentCar.getCurrentRoad( ).removeFrom(currentCar);
 						cars.remove(currentCar);
-						sman.removeSprite(currentCar.getCarsSprite().getId());
+						sman.removeSprite(currentCar.getCarsSprite( ).getId( ));
 						j--;
-						if(FinalYear.startTracking==true)
+						if(FinalYear.startTracking)
 						{
 							addToDataAtCarFinish(currentCar);
 						}
-					} else if (returnValue.equals("Failed to Move")) {
+					}
+					else if(returnValue.equals("Failed to Move"))
+					{
 						break;
-					} else if (temp.getCarsOnRoad().size() == j - 1) {
+					}
+					else if(temp.getCarsOnRoad( ).size( ) == j - 1)
+					{
 						carsWhichFailedToMove.remove(carsWhichFailedToMove.get(i));
 					}
 				}
 			}
 		}
 		int amountOfCarsWhichFailedToMove = 0;
-		for (int i = 0; i < carsWhichFailedToMove.size(); i++) {
-			Road temp = carsWhichFailedToMove.get(i);
-			for (int j = 0; j < temp.getCarsOnRoad().size(); j++) {
-				String returnValue = temp.getCarsOnRoad().get(j).moveCar(true);
-				if (returnValue.equals("Finished")) 
+		for(Road temp : carsWhichFailedToMove)
+		{
+			for(int j = 0; j < temp.getCarsOnRoad( ).size( ); j++)
+			{
+				String returnValue = temp.getCarsOnRoad( ).get(j).moveCar(true);
+				if(returnValue.equals("Finished"))
 				{
-					Car currentCar = temp.getCarsOnRoad().remove(j);
+					Car currentCar = temp.getCarsOnRoad( ).remove(j);
 					if(Config.REASKUSERTOCHANGEONFINISH)
 					{
-						UserInputFile.weightsOfEdgesAfterInitialization(currentCar, currentCar.getCurrentRoad(), "CarFinished");
+						UserInputFile.weightsOfEdgesAfterInitialization(currentCar, currentCar.getCurrentRoad( ), "CarFinished");
 					}
-					currentCar.getCurrentRoad().removeFrom(currentCar);
+					currentCar.getCurrentRoad( ).removeFrom(currentCar);
 					cars.remove(currentCar);
-					sman.removeSprite(currentCar.getCarsSprite().getId());
+					sman.removeSprite(currentCar.getCarsSprite( ).getId( ));
 					j--;
-					if(FinalYear.startTracking==true)
+					if(FinalYear.startTracking)
 					{
 						addToDataAtCarFinish(currentCar);
 					}
@@ -546,59 +552,61 @@ public class FinalYear
 				}
 			}
 		}
-		if(FinalYear.startTracking==true)
+		if(FinalYear.startTracking)
 		{
-			sortOutDataAtEndOfTimestep();
+			sortOutDataAtEndOfTimestep( );
 		}
-		for (int i = 0; i < cars.size(); i++) {
-			cars.get(i).setHasMoved(false);
-			if (cars.get(i).fuelApplied > 1) {
+		for(Car car : cars)
+		{
+			car.setHasMoved(false);
+			if(car.getFuelApplied( ) > 1)
+			{
 				System.out.println("We have Problems");
 			}
-			cars.get(i).fuelApplied = 0;
+			car.setFuelApplied(0);
 		}
 	}
+	
 	private static void sortOutDataAtEndOfTimestep()
 	{
-		averageSpeedAtTimestep.appendToFile(new StringBuilder().append("\n"+ getTimestep() + " " + Car.averageSpeedOfVehiclesInTimeStep.doubleValue()));
-		Car.averageSpeedOfVehiclesInTimeStep = new BigDecimal(0);
-		Car.averageOfHowMany=0;
-		
+		averageSpeedAtTimestep.appendToFile(new StringBuilder( ).append("\n").append(getTimestep( )).append(" ").append(FuelDependancies.getAverageSpeedOfVehiclesInTimeStep( ).doubleValue( )));
+		FuelDependancies.setAverageSpeedOfVehiclesInTimeStep(new BigDecimal(0));
+		FuelDependancies.setAverageOfHowMany(0);
 	}
-
+	
 	private static void sortOutWeightsInitialization()
 	{
-		for(int i = 0; i < roadsInSystem.length; i++)
+		for(Road aRoadsInSystem : roadsInSystem)
 		{
-			UserInputFile.determineWeightOfRoadInitial(roadsInSystem[i].getWeightOfRoad(), roadsInSystem[i]);
+			UserInputFile.determineWeightOfRoadInitial(aRoadsInSystem.getWeightOfRoad( ), aRoadsInSystem);
 		}
 	}
 	
 	private static void createCarsConfigIndex()
 	{
 		int k = 0;
-		while ((cars.size() < Config.AMOUNTOFCARSINSIMULATION && initialization == true) || k < Config.AMOUNTOFVEHICLESTOADDONEACHADDITION) 
+		while((cars.size( ) < Config.AMOUNTOFCARSINSIMULATION && initialization) || k < Config.AMOUNTOFVEHICLESTOADDONEACHADDITION)
 		{
-			if(carConfig==null)
+			if(carConfig == null)
 			{
-				ReadFile file = new ReadFile(carsConfig+prefixConfig+"\\test"+currentRunthrough+"\\cars.txt");
-				carConfig = file.OpenFile();
+				ReadFile file = new ReadFile(carsConfig + prefixConfig + "/test" + currentRunthrough + "/cars.txt");
+				carConfig = file.OpenFile( );
 			}
-			for (int i = 0; i < carConfig.length; i++) 
+			for(String aCarConfig : carConfig)
 			{
 				String[] connections = carConfig[lastCarAdded].split(" ");
-				lastCarAdded = (lastCarAdded+1)%carConfig.length;
-				Sprite carSprite = sman.addSprite(amountOfCarsAddedSoFar+"");
+				lastCarAdded = (lastCarAdded + 1) % carConfig.length;
+				Sprite carSprite = sman.addSprite(amountOfCarsAddedSoFar + "");
 				amountOfCarsAddedSoFar++;
 				Car carAdded = (roadsInSystem[Integer.parseInt(connections[0])].addCar(roadsInSystem[Integer.parseInt(connections[0])].getPointOnRoad(Integer.parseInt(connections[1])), roadsInSystem[Integer.parseInt(connections[2])].getPointOnRoad(Integer.parseInt(connections[3])), Integer.parseInt(connections[4]), carSprite));
 				if(Config.REASKUSERTOCHANGEONADDITION)
 				{
-					UserInputFile.weightsOfEdgesAfterInitialization(carAdded, carAdded.getCurrentRoad(), "CarAdded");
+					UserInputFile.weightsOfEdgesAfterInitialization(carAdded, carAdded.getCurrentRoad( ), "CarAdded");
 				}
 				cars.add(carAdded);
-				carSprite.setPosition(carAdded.getCurrentX(), carAdded.getCurrentY(), 0);
+				carSprite.setPosition(carAdded.getCurrentX( ), carAdded.getCurrentY( ), 0);
 				k++;
-				if(k >= Config.AMOUNTOFVEHICLESTOADDONEACHADDITION||(cars.size() >= Config.AMOUNTOFCARSINSIMULATION && initialization == true))
+				if(k >= Config.AMOUNTOFVEHICLESTOADDONEACHADDITION || (cars.size( ) >= Config.AMOUNTOFCARSINSIMULATION && initialization))
 				{
 					break;
 				}
@@ -608,48 +616,48 @@ public class FinalYear
 	
 	private static void createCarsConfigUserInput()
 	{
-		ReadFile file = new ReadFile(carsConfig+prefixConfig+"\\test"+currentRunthrough+"\\cars.txt");
-		String[] aryLines = file.OpenFile();
+		ReadFile file = new ReadFile(carsConfig + prefixConfig + "/test" + currentRunthrough + "/cars.txt");
+		String[] aryLines = file.OpenFile( );
 		int firstLine = 0;
 		boolean wrongFormat = true;
-		StringBuilder output = new StringBuilder();
-		for (int i = 0; i < aryLines.length; i++) 
+		StringBuilder output = new StringBuilder( );
+		for(String aryLine : aryLines)
 		{
-			String[] connections = aryLines[i].split(" ");
-			if(connections.length==5)
+			String[] connections = aryLine.split(" ");
+			if(connections.length == 5)
 			{
 				wrongFormat = false;
 				break;
 			}
-			int goingFromIndex = -1;
-			int goingToIndex = -1;
-			for (int j = 0; j < roadsInSystem.length; j++) 
+			int goingFromIndex = - 1;
+			int goingToIndex = - 1;
+			for(int j = 0; j < roadsInSystem.length; j++)
 			{
-				if(roadsInSystem[j].getGoingFrom().getName().equals(connections[0])&&roadsInSystem[j].getGoingTo().getName().equals(connections[1]))
+				if(roadsInSystem[j].getGoingFrom( ).getName( ).equals(connections[0]) && roadsInSystem[j].getGoingTo( ).getName( ).equals(connections[1]))
 				{
-					goingFromIndex=j;
+					goingFromIndex = j;
 				}
-				if(roadsInSystem[j].getGoingFrom().getName().equals(connections[3])&&roadsInSystem[j].getGoingTo().getName().equals(connections[4]))
+				if(roadsInSystem[j].getGoingFrom( ).getName( ).equals(connections[3]) && roadsInSystem[j].getGoingTo( ).getName( ).equals(connections[4]))
 				{
-					goingToIndex=j;
+					goingToIndex = j;
 				}
-				if(goingFromIndex!=-1&&goingToIndex!=-1)
+				if(goingFromIndex != - 1 && goingToIndex != - 1)
 				{
 					break;
 				}
 			}
 			if(firstLine == 0)
 			{
-				output.append(goingFromIndex+" "+connections[2]+" "+goingToIndex+" "+connections[5]+" "+connections[6]);
+				output.append(goingFromIndex).append(" ").append(connections[2]).append(" ").append(goingToIndex).append(" ").append(connections[5]).append(" ").append(connections[6]);
 				firstLine = 1;
 			}
 			else
-				output.append("\n"+goingFromIndex+" "+connections[2]+" "+goingToIndex+" "+connections[5]+" "+connections[6]);
+				output.append("\n").append(goingFromIndex).append(" ").append(connections[2]).append(" ").append(goingToIndex).append(" ").append(connections[5]).append(" ").append(connections[6]);
 		}
-		if(wrongFormat == true)
+		if(wrongFormat)
 		{
-			AppendToFile fileWrite = new AppendToFile(carsConfig+prefixConfig+"\\test"+currentRunthrough+"\\cars.txt");
-			fileWrite.cleanFile();
+			AppendToFile fileWrite = new AppendToFile(carsConfig + prefixConfig + "/test" + currentRunthrough + "/cars.txt");
+			fileWrite.cleanFile( );
 			fileWrite.appendToFile(output);
 		}
 	}
@@ -657,45 +665,43 @@ public class FinalYear
 	
 	private static void createCarsRandom()
 	{
-		double temp = System.currentTimeMillis();
 		int k = 0;
-		StringBuilder output = new StringBuilder();
 		boolean newLine = false;
-		while ((cars.size() < Config.AMOUNTOFCARSINSIMULATION && initialization == true) || k < Config.AMOUNTOFVEHICLESTOADDONEACHADDITION) 
+		while((cars.size( ) < Config.AMOUNTOFCARSINSIMULATION && initialization) || k < Config.AMOUNTOFVEHICLESTOADDONEACHADDITION)
 		{
-			Random rand = new Random();
-			int roadToPick = rand.nextInt((int)sumOfAllRoadLengths);
+			Random rand = new Random( );
+			int roadToPick = rand.nextInt((int) sumOfAllRoadLengths);
 			int roadChoice = 0;
-			while(roadToPick>=0)
+			while(roadToPick >= 0)
 			{
-				roadToPick = roadToPick - (int)Math.ceil(roadsInSystem[roadChoice].getDistance());
+				roadToPick = roadToPick - (int) Math.ceil(roadsInSystem[roadChoice].getDistance( ));
 				roadChoice++;
 			}
 			roadChoice--;
-			roadToPick = rand.nextInt((int)sumOfAllRoadLengths);
+			roadToPick = rand.nextInt((int) sumOfAllRoadLengths);
 			int roadChoice2 = 0;
-			while(roadToPick>=0)
+			while(roadToPick >= 0)
 			{
-				roadToPick = roadToPick - (int)Math.ceil(roadsInSystem[roadChoice2].getDistance());
+				roadToPick = roadToPick - (int) Math.ceil(roadsInSystem[roadChoice2].getDistance( ));
 				roadChoice2++;
 			}
 			roadChoice2--;
-			int percentIntoRoad = rand.nextInt(80)+10;
-			int percentIntoRoadEndPoint = rand.nextInt(80)+10;
-			Sprite carSprite = sman.addSprite(amountOfCarsAddedSoFar+"");
+			int percentIntoRoad = rand.nextInt(80) + 10;
+			int percentIntoRoadEndPoint = rand.nextInt(80) + 10;
+			Sprite carSprite = sman.addSprite(amountOfCarsAddedSoFar + "");
 			amountOfCarsAddedSoFar++;
-			if(newLine==true||initialization==false)
+			if(newLine || ! initialization)
 			{
 				carOutput.append("\n");
 			}
 			int sumPercent = Config.LOWFUELPERCENT + Config.HIGHFUELPERCENT + Config.MEDIUMFUELPERCENT;
 			int randomNumber = rand.nextInt(sumPercent);
-			int fuel = -1;
-			if(randomNumber<Config.LOWFUELPERCENT)
+			int fuel;
+			if(randomNumber < Config.LOWFUELPERCENT)
 			{
 				fuel = 0;
 			}
-			else if (randomNumber<Config.MEDIUMFUELPERCENT+Config.LOWFUELPERCENT)
+			else if(randomNumber < Config.MEDIUMFUELPERCENT + Config.LOWFUELPERCENT)
 			{
 				fuel = 1;
 			}
@@ -703,149 +709,146 @@ public class FinalYear
 			{
 				fuel = 2;
 			}
-			carOutput.append(roadChoice + " " + percentIntoRoad + " " + roadChoice2 + " " + percentIntoRoadEndPoint + " " + fuel);
-			newLine=true;
+			carOutput.append(roadChoice).append(" ").append(percentIntoRoad).append(" ").append(roadChoice2).append(" ").append(percentIntoRoadEndPoint).append(" ").append(fuel);
+			newLine = true;
 			Car carAdded = (roadsInSystem[roadChoice].addCar(roadsInSystem[roadChoice].getPointOnRoad(percentIntoRoad), roadsInSystem[roadChoice2].getPointOnRoad(percentIntoRoadEndPoint), fuel, carSprite));
 			if(Config.REASKUSERTOCHANGEONADDITION)
 			{
-				UserInputFile.weightsOfEdgesAfterInitialization(carAdded, carAdded.getCurrentRoad(), "CarAdded");
+				UserInputFile.weightsOfEdgesAfterInitialization(carAdded, carAdded.getCurrentRoad( ), "CarAdded");
 			}
 			cars.add(carAdded);
-			carSprite.setPosition(carAdded.getCurrentX(), carAdded.getCurrentY(), 0);
+			carSprite.setPosition(carAdded.getCurrentX( ), carAdded.getCurrentY( ), 0);
 			k++;
 		}
 	}
 	
-	private static void createObjectMap() 
+	private static void createObjectMap()
 	{
 		intersectionList = new IntersectionAbstract[nodeInfoStored.length];
-		for (int i = 0; i < nodeInfoStored.length; i++) 
+		for(int i = 0; i < nodeInfoStored.length; i++)
 		{
-			if(nodeInfoStored[i][4]>4)
+			if(nodeInfoStored[i][4] > 4)
 			{
-				intersectionList[i] = new Roundabout(nodeInfoStored[i][0],nodeInfoStored[i][1],nodeInfoStored[i][2],nodeInfoStored[i][3],viewer.getGraphicGraph().getNode(i+""),(int)nodeInfoStored[i][4]);
+				intersectionList[i] = new Roundabout(nodeInfoStored[i][0], nodeInfoStored[i][1], nodeInfoStored[i][3], (int) nodeInfoStored[i][4]);
 			}
-			else if(nodeInfoStored[i][4]==4)
+			else if(nodeInfoStored[i][4] == 4)
 			{
-				intersectionList[i] = new CrossRoads(nodeInfoStored[i][0],nodeInfoStored[i][1],nodeInfoStored[i][2],nodeInfoStored[i][3],viewer.getGraphicGraph().getNode(i+""),(int)nodeInfoStored[i][4]);
+				intersectionList[i] = new CrossRoads(nodeInfoStored[i][0], nodeInfoStored[i][1], nodeInfoStored[i][2], nodeInfoStored[i][3], (int) nodeInfoStored[i][4]);
 			}
-			else if(nodeInfoStored[i][4]==3)
+			else if(nodeInfoStored[i][4] == 3)
 			{
-				intersectionList[i] = new Tjunction(nodeInfoStored[i][0],nodeInfoStored[i][1],nodeInfoStored[i][2],nodeInfoStored[i][3],viewer.getGraphicGraph().getNode(i+""),(int)nodeInfoStored[i][4]);
+				intersectionList[i] = new Tjunction(nodeInfoStored[i][0], nodeInfoStored[i][1], nodeInfoStored[i][3], (int) nodeInfoStored[i][4]);
 			}
-			else if(nodeInfoStored[i][4]==2)
+			else if(nodeInfoStored[i][4] == 2)
 			{
-				intersectionList[i] = new Passthrough(nodeInfoStored[i][0],nodeInfoStored[i][1],nodeInfoStored[i][2],nodeInfoStored[i][3],viewer.getGraphicGraph().getNode(i+""),(int)nodeInfoStored[i][4]);
+				intersectionList[i] = new Passthrough(nodeInfoStored[i][0], nodeInfoStored[i][1], nodeInfoStored[i][3], (int) nodeInfoStored[i][4]);
 			}
-			else if(nodeInfoStored[i][4]==1)
+			else if(nodeInfoStored[i][4] == 1)
 			{
-				intersectionList[i] = new ClosedRoad(nodeInfoStored[i][0],nodeInfoStored[i][1],nodeInfoStored[i][2],nodeInfoStored[i][3],viewer.getGraphicGraph().getNode(i+""),(int)nodeInfoStored[i][4]);
+				intersectionList[i] = new ClosedRoad(nodeInfoStored[i][0], nodeInfoStored[i][1], nodeInfoStored[i][3], (int) nodeInfoStored[i][4]);
 			}
 		}
 		int amountOfRoadsOverall = 0;
-		for (int i = 0; i < connectionInfo.length; i++) 
+		for(int[] aConnectionInfo : connectionInfo)
 		{
-			for (int j = 0; j < connectionInfo.length; j++) 
+			for(int j = 0; j < connectionInfo.length; j++)
 			{
-				if(connectionInfo[i][j]==1)
+				if(aConnectionInfo[j] == 1)
 				{
 					amountOfRoadsOverall++;
 				}
 			}
 		}
-		roadsInSystem = new Road[amountOfRoadsOverall]; 
+		roadsInSystem = new Road[amountOfRoadsOverall];
 		int currentInsertIndexOverall = 0;
-		for (int i = 0; i < connectionInfo.length; i++) 
+		for(int i = 0; i < connectionInfo.length; i++)
 		{
-			TreeSet<Road> listOfConnectedNodes = new TreeSet<Road>(new compareRoadAngles());
-			for (int j = 0; j < connectionInfo.length; j++) 
+			TreeSet<Road> listOfConnectedNodes = new TreeSet<Road>( );
+			for(int j = 0; j < connectionInfo.length; j++)
 			{
-				if(connectionInfo[i][j]==1)
+				if(connectionInfo[i][j] == 1)
 				{
-					sumOfAllRoadLengths=sumOfAllRoadLengths+distances[i][j];
-					Road tempRoad = null;
-					if(j<i)
+					sumOfAllRoadLengths = sumOfAllRoadLengths + distances[i][j];
+					Road tempRoad;
+					if(j < i)
 					{
-						tempRoad=new Road(intersectionList[i],intersectionList[j],anglesBetweenNodes[i][j],distances[i][j],speedOfRoads[i][j],viewer.getGraphicGraph().getEdge(i+""+j),'R');
+						tempRoad = new Road(intersectionList[i], intersectionList[j], anglesBetweenNodes[i][j], distances[i][j], speedOfRoads[i][j], 'R');
 					}
 					else
 					{
-						tempRoad=new Road(intersectionList[i],intersectionList[j],anglesBetweenNodes[i][j],distances[i][j],speedOfRoads[i][j],viewer.getGraphicGraph().getEdge(i+""+j),'B');
+						tempRoad = new Road(intersectionList[i], intersectionList[j], anglesBetweenNodes[i][j], distances[i][j], speedOfRoads[i][j], 'B');
 					}
-
+					
 					roadsInSystem[currentInsertIndexOverall] = tempRoad;
 					currentInsertIndexOverall++;
 					listOfConnectedNodes.add(tempRoad);
 					intersectionList[j].addInConnections(tempRoad);
 				}
 			}
-			intersectionList[i].addOutConnections(listOfConnectedNodes.toArray(new Road[listOfConnectedNodes.size()]));
+			intersectionList[i].addOutConnections(listOfConnectedNodes.toArray(new Road[0]));
 		}
-		for (int i = 0; i < intersectionList.length; i++) 
+		for(IntersectionAbstract anIntersectionList : intersectionList)
 		{
-			intersectionList[i].sortOutOutgoingConnections();
+			anIntersectionList.sortOutOutgoingConnections( );
 		}
-	}
-
-	@SuppressWarnings("unused")
-	private static void createRoads() 
-	{
-		if (Config.RANDOMROADS || Config.RANDOMINTERSECTIONS) 
-		{
-			createRoadsRandom();
-		} 
-		else 
-		{
-			createRoadsFromConfig();
-		}
-	}
-
-	private static void createNodes() 
-	{
-		if (Config.RANDOMINTERSECTIONS) 
-		{
-			createNodesRandom();
-			setLocationsOnGraphStream();
-		} 
-		else 
-		{
-			createNodesFromConfig();
-		}
-		updateNodeLocations();
 	}
 	
-	@SuppressWarnings("unused")
-	private static void workOutAngles() 
+	private static void createRoads()
+	{
+		if(Config.RANDOMROADS || Config.RANDOMINTERSECTIONS)
+		{
+			createRoadsRandom( );
+		}
+		else
+		{
+			createRoadsFromConfig( );
+		}
+	}
+	
+	private static void createNodes()
+	{
+		if(Config.RANDOMINTERSECTIONS)
+		{
+			createNodesRandom( );
+			setLocationsOnGraphStream( );
+		}
+		else
+		{
+			createNodesFromConfig( );
+		}
+		updateNodeLocations( );
+	}
+	
+	private static void workOutAngles()
 	{
 		anglesBetweenNodes = new double[connectionInfo.length][connectionInfo.length];
 		distances = new double[connectionInfo.length][connectionInfo.length];
-		for (int i = 0; i < connectionInfo.length; i++) 
+		for(int i = 0; i < connectionInfo.length; i++)
 		{
-			int amountOfConnections = 0;
-			for (int j = i; j < connectionInfo.length; j++) 
+			for(int j = i; j < connectionInfo.length; j++)
 			{
-				if(connectionInfo[i][j]==1)
+				if(connectionInfo[i][j] == 1)
 				{
 					double xVal1 = nodeInfoStored[i][0];
 					double xVal2 = nodeInfoStored[j][0];
 					double yVal1 = nodeInfoStored[i][1];
 					double yVal2 = nodeInfoStored[j][1];
-					double differenceX = xVal1-xVal2;
-					double differenceY = yVal1-yVal2;
-					double angle = 0;
+					double differenceX = xVal1 - xVal2;
+					double differenceY = yVal1 - yVal2;
+					double angle;
 					angle = Math.atan2(differenceY, differenceX);
 					anglesBetweenNodes[i][j] = angle;
-					if(angle<0)
+					if(angle < 0)
 					{
-						anglesBetweenNodes[j][i] = angle+(Math.PI);
+						anglesBetweenNodes[j][i] = angle + (Math.PI);
 					}
-					else if(angle>0)
+					else if(angle > 0)
 					{
-						anglesBetweenNodes[j][i] = angle-(Math.PI);
+						anglesBetweenNodes[j][i] = angle - (Math.PI);
 					}
-					if(angle==0)
+					if(angle == 0)
 					{
-						if(xVal1>xVal2)
+						if(xVal1 > xVal2)
 						{
 							anglesBetweenNodes[i][j] = 0;
 							anglesBetweenNodes[j][i] = Math.PI;
@@ -856,9 +859,9 @@ public class FinalYear
 							anglesBetweenNodes[j][i] = 0;
 						}
 					}
-					distances[i][j] = Math.sqrt(Math.pow(xVal1-xVal2, 2)+Math.pow(yVal1-yVal2, 2));
+					distances[i][j] = Math.sqrt(Math.pow(xVal1 - xVal2, 2) + Math.pow(yVal1 - yVal2, 2));
 					distances[j][i] = distances[i][j];
-					if(!(Config.RANDOMROADS||Config.RANDOMINTERSECTIONS))
+					if(! (Config.RANDOMROADS || Config.RANDOMINTERSECTIONS))
 					{
 						nodeInfoStored[i][4]++;
 						nodeInfoStored[j][4]++;
@@ -867,54 +870,54 @@ public class FinalYear
 			}
 		}
 	}
-
+	
 	private static void setLocationsOnGraphStream()
 	{
-		for (int i = 0; i < nodeInfoStored.length; i++) 
+		for(int i = 0; i < nodeInfoStored.length; i++)
 		{
-			Node theNode = graph.addNode(i+"");
-			theNode.setAttribute("xyz",nodeInfoStored[i][0],nodeInfoStored[i][1],0);
+			Node theNode = graph.addNode(i + "");
+			theNode.setAttribute("xyz", nodeInfoStored[i][0], nodeInfoStored[i][1], 0);
 			theNode.setAttribute("layout.weight", Integer.MAX_VALUE);
 			theNode.setAttribute("ui.label", i);
 		}
-		try 
+		try
 		{
 			Thread.sleep(1000);
-		} 
-		catch (Exception e) 
-		{
-			e.printStackTrace();
 		}
-		viewer.disableAutoLayout();
-		//System.out.println("here");
-		double smallestDoubleX = Double.MAX_VALUE-1;
-		double largestDoubleX = -Double.MAX_VALUE;
-		double smallestDoubleY = Double.MAX_VALUE-1;
-		double largestDoubleY = -Double.MAX_VALUE;
-		for (int i = 0; i < nodeInfoStored.length; i++) 
+		catch(Exception e)
 		{
-			GraphicNode theNodeGraphic = viewer.getGraphicGraph().getNode(i+"");
-			if(smallestDoubleX>theNodeGraphic.getX())
+			e.printStackTrace( );
+		}
+		viewer.disableAutoLayout( );
+		//System.out.println("here");
+		double smallestDoubleX = Double.MAX_VALUE - 1;
+		double largestDoubleX = - Double.MAX_VALUE;
+		double smallestDoubleY = Double.MAX_VALUE - 1;
+		double largestDoubleY = - Double.MAX_VALUE;
+		for(int i = 0; i < nodeInfoStored.length; i++)
+		{
+			GraphicNode theNodeGraphic = viewer.getGraphicGraph( ).getNode(i + "");
+			if(smallestDoubleX > theNodeGraphic.getX( ))
 			{
-				smallestDoubleX = theNodeGraphic.getX();
+				smallestDoubleX = theNodeGraphic.getX( );
 			}
-			if(largestDoubleX<theNodeGraphic.getX())
+			if(largestDoubleX < theNodeGraphic.getX( ))
 			{
-				largestDoubleX = theNodeGraphic.getX();
+				largestDoubleX = theNodeGraphic.getX( );
 			}
-			if(smallestDoubleY>theNodeGraphic.getY())
+			if(smallestDoubleY > theNodeGraphic.getY( ))
 			{
-				smallestDoubleY = theNodeGraphic.getY();
+				smallestDoubleY = theNodeGraphic.getY( );
 			}
-			if(largestDoubleY<theNodeGraphic.getY())
+			if(largestDoubleY < theNodeGraphic.getY( ))
 			{
-				largestDoubleY = theNodeGraphic.getY();
+				largestDoubleY = theNodeGraphic.getY( );
 			}
 		}
 		double largestY = largestDoubleY + Math.abs(smallestDoubleY);
 		double largestX = largestDoubleX + Math.abs(smallestDoubleX);
-		double largest = 0;
-		if(largestY<largestX)
+		double largest;
+		if(largestY < largestX)
 		{
 			largest = largestX;
 		}
@@ -922,60 +925,59 @@ public class FinalYear
 		{
 			largest = largestY;
 		}
-		double scale = Config.MAPSIZEY/(largest);
-		for (int i = 0; i < nodeInfoStored.length; i++) 
+		double scale = Config.MAPSIZEY / (largest);
+		for(int i = 0; i < nodeInfoStored.length; i++)
 		{
-			GraphicNode theNodeGraphic = viewer.getGraphicGraph().getNode(i+"");
-			theNodeGraphic.setAttribute("xyz", (theNodeGraphic.getX()-smallestDoubleX)*scale,(theNodeGraphic.getY()-smallestDoubleY)*scale,0);
-			nodeInfoStored[i][0]=theNodeGraphic.getX();
-			nodeInfoStored[i][1]=theNodeGraphic.getY();
+			GraphicNode theNodeGraphic = viewer.getGraphicGraph( ).getNode(i + "");
+			theNodeGraphic.setAttribute("xyz", (theNodeGraphic.getX( ) - smallestDoubleX) * scale, (theNodeGraphic.getY( ) - smallestDoubleY) * scale, 0);
+			nodeInfoStored[i][0] = theNodeGraphic.getX( );
+			nodeInfoStored[i][1] = theNodeGraphic.getY( );
 		}
 	}
 	
 	private static void createGraph()
 	{
 		graph = new SingleGraph("Graph" + currentRunthrough);
-		graph.clear();
+		graph.clear( );
 		viewer = graph.display(false);
 		sman = new SpriteManager(graph);
-		layout = new SpringBox();
+		BarnesHutLayout layout = new SpringBox( );
 		layout.setForce(0.005);
 		layout.setStabilizationLimit(0.5);
 		layout.setQuality(1);
 		viewer.enableAutoLayout(layout);
-		
 	}
 	
-	private static void updateNodeLocations() 
+	private static void updateNodeLocations()
 	{
-		StringBuilder output = new StringBuilder();
-		output.append(nodeInfoStored[0][0] + " " + nodeInfoStored[0][1] + " " + (nodeInfoStored[0][2]*Config.SIMACCELERATION));
-		for (int i = 1; i < nodeInfoStored.length; i++) 
+		StringBuilder output = new StringBuilder( );
+		output.append(nodeInfoStored[0][0]).append(" ").append(nodeInfoStored[0][1]).append(" ").append(nodeInfoStored[0][2] * Config.SIMACCELERATION);
+		for(int i = 1; i < nodeInfoStored.length; i++)
 		{
-			output.append("\n" + nodeInfoStored[i][0] + " " + nodeInfoStored[i][1] + " " + (nodeInfoStored[i][2]*Config.SIMACCELERATION));
+			output.append("\n").append(nodeInfoStored[i][0]).append(" ").append(nodeInfoStored[i][1]).append(" ").append(nodeInfoStored[i][2] * Config.SIMACCELERATION);
 		}
-		nodeFile = new AppendToFile(nodesConfig+prefixConfig+"\\test"+currentRunthrough+"\\nodes.txt");
-		nodeFile.cleanFile();
-		nodeFile.openWriterAppend();
+		nodeFile = new AppendToFile(nodesConfig + prefixConfig + "/test" + currentRunthrough + "/nodes.txt");
+		nodeFile.cleanFile( );
+		nodeFile.openWriterAppend( );
 		nodeFile.appendToFile(output);
-		nodeFile.closeWriterAppend();
+		nodeFile.closeWriterAppend( );
 	}
-
-	private static void createNodesFromConfig() 
+	
+	private static void createNodesFromConfig()
 	{
-		viewer.disableAutoLayout();
-		ReadFile file = new ReadFile(nodesConfig +prefixConfig+ "\\test"+currentRunthrough +"\\nodes.txt");
-		String[] aryLines = file.OpenFile();
-		nodeInfoStored = new double[aryLines.length][5]; 
+		viewer.disableAutoLayout( );
+		ReadFile file = new ReadFile(nodesConfig + prefixConfig + "/test" + currentRunthrough + "/nodes.txt");
+		String[] aryLines = file.OpenFile( );
+		nodeInfoStored = new double[aryLines.length][5];
 		for(int i = 0; i < aryLines.length; i++)
 		{
 			String[] nodeInfo = aryLines[i].split(" ");
 			double xCord = Double.parseDouble(nodeInfo[0]);
 			double yCord = Double.parseDouble(nodeInfo[1]);
 			double Interval = Double.parseDouble(nodeInfo[2]);
-			for (int j = 0; j < i; j++) 
+			for(int j = 0; j < i; j++)
 			{
-				if(xCord==nodeInfoStored[j][0]&&yCord==nodeInfoStored[j][1])
+				if(xCord == nodeInfoStored[j][0] && yCord == nodeInfoStored[j][1])
 				{
 					System.out.println("Node " + i + "has the same x and y co'ordinates as another intersection please restart the program and correct the error");
 					if(debug)
@@ -985,40 +987,40 @@ public class FinalYear
 					System.exit(1);
 				}
 			}
-			nodeInfoStored[i][0]=xCord;
-			nodeInfoStored[i][1]=yCord;
-			nodeInfoStored[i][2]=Interval/Config.SIMACCELERATION;
+			nodeInfoStored[i][0] = xCord;
+			nodeInfoStored[i][1] = yCord;
+			nodeInfoStored[i][2] = Interval / Config.SIMACCELERATION;
 			nodeInfoStored[i][3] = i;
-			Node theNode = graph.addNode(i+"");
-			theNode.setAttribute("xyz",nodeInfoStored[i][0],nodeInfoStored[i][1],0);
+			Node theNode = graph.addNode(i + "");
+			theNode.setAttribute("xyz", nodeInfoStored[i][0], nodeInfoStored[i][1], 0);
 			theNode.setAttribute("layout.weight", Integer.MAX_VALUE);
 			theNode.setAttribute("ui.label", i);
 		}
 	}
 	
-	private static void createNodesRandom() 
+	private static void createNodesRandom()
 	{
-		Random rand = new Random();
+		Random rand = new Random( );
 		int failAmount = 0;
 		double minDistance = 100;
-		nodeInfoStored = new double[Config.AMOUNTOFINTERSECTIONS][5]; 
+		nodeInfoStored = new double[Config.AMOUNTOFINTERSECTIONS][5];
 		int nodesAdded = 0;
 		while(nodesAdded < Config.AMOUNTOFINTERSECTIONS)
 		{
 			double xCord = (rand.nextInt(Config.MAPSIZEX));
 			double yCord = (rand.nextInt(Config.MAPSIZEY));
-			double nodeInterval = (rand.nextInt(Config.MAXINTERSECTIONINTERVAL-Config.MININTERSECTIONINTERVAL+1) + Config.MININTERSECTIONINTERVAL)/Config.SIMACCELERATION;
+			double nodeInterval = (rand.nextInt(Config.MAXINTERSECTIONINTERVAL - Config.MININTERSECTIONINTERVAL + 1) + Config.MININTERSECTIONINTERVAL) / Config.SIMACCELERATION;
 			boolean found = false;
-			for (int i = 0; i < nodesAdded; i++) 
+			for(int i = 0; i < nodesAdded; i++)
 			{
-				double distance = Math.sqrt(Math.pow(xCord-nodeInfoStored[i][0], 2)+Math.pow(yCord-nodeInfoStored[i][1], 2));
-				if(distance<minDistance)
+				double distance = Math.sqrt(Math.pow(xCord - nodeInfoStored[i][0], 2) + Math.pow(yCord - nodeInfoStored[i][1], 2));
+				if(distance < minDistance)
 				{
 					found = true;
 					break;
 				}
 			}
-			if(found==false)
+			if(! found)
 			{
 				failAmount = 0;
 				nodeInfoStored[nodesAdded][0] = xCord;
@@ -1030,7 +1032,7 @@ public class FinalYear
 			else
 			{
 				failAmount++;
-				if (failAmount == 20 && minDistance > 1) 
+				if(failAmount == 20 && minDistance > 1)
 				{
 					failAmount = 0;
 					minDistance = minDistance - 1;
@@ -1039,131 +1041,125 @@ public class FinalYear
 		}
 	}
 	
-	private static void createRoadsFromConfig() 
+	private static void createRoadsFromConfig()
 	{
 		connectionInfo = new int[nodeInfoStored.length][nodeInfoStored.length];
 		speedOfRoads = new double[nodeInfoStored.length][nodeInfoStored.length];
-		ReadFile file = new ReadFile(roadsConfig +prefixConfig+ "\\test"+currentRunthrough +"\\roads.txt");
-		String[] aryLines = file.OpenFile();
-		for (int i = 0; i < aryLines.length; i++) 
+		ReadFile file = new ReadFile(roadsConfig + prefixConfig + "/test" + currentRunthrough + "/roads.txt");
+		String[] aryLines = file.OpenFile( );
+		for(String aryLine : aryLines)
 		{
-			String[] coOrdinates = aryLines[i].split(" ");
+			String[] coOrdinates = aryLine.split(" ");
 			int node1Index = Integer.parseInt(coOrdinates[0]);
 			int node2Index = Integer.parseInt(coOrdinates[1]);
 			double speedOfRoad = Double.parseDouble(coOrdinates[2]);
-			if(node1Index<connectionInfo.length&&node2Index<connectionInfo.length)
+			if(node1Index < connectionInfo.length && node2Index < connectionInfo.length)
 			{
 				connectionInfo[node1Index][node2Index] = 1;
 				connectionInfo[node2Index][node1Index] = 1;
 				speedOfRoads[node1Index][node2Index] = speedOfRoad;
 				speedOfRoads[node2Index][node1Index] = speedOfRoad;
-				graph.addEdge(nodeInfoStored[node1Index][3]+" "+nodeInfoStored[node2Index][3], (int)nodeInfoStored[node1Index][3]+"", (int)nodeInfoStored[node2Index][3]+"",true);
-				graph.addEdge(nodeInfoStored[node2Index][3]+" "+nodeInfoStored[node1Index][3], (int)nodeInfoStored[node2Index][3]+"", (int)nodeInfoStored[node1Index][3]+"",true);
+				graph.addEdge(nodeInfoStored[node1Index][3] + " " + nodeInfoStored[node2Index][3], (int) nodeInfoStored[node1Index][3] + "", (int) nodeInfoStored[node2Index][3] + "", true);
+				graph.addEdge(nodeInfoStored[node2Index][3] + " " + nodeInfoStored[node1Index][3], (int) nodeInfoStored[node2Index][3] + "", (int) nodeInfoStored[node1Index][3] + "", true);
 			}
 		}
 	}
 	
-	@SuppressWarnings("all")
-	private static void createRoadsRandom() 
+	private static void createRoadsRandom()
 	{
 		speedOfRoads = new double[nodeInfoStored.length][nodeInfoStored.length];
-		viewer.disableAutoLayout();
-		Random rand = new Random();
-		StringBuilder output = new StringBuilder();
-		LinkedList<double[]> nodesWithConnections = new LinkedList<double[]>();
-		LinkedList<double[]> nodesWithoutConnections = new LinkedList<double[]>();
-		for (int i = 0; i < nodeInfoStored.length; i++) 
-		{
-			nodesWithoutConnections.add(nodeInfoStored[i]);
-		}
+		viewer.disableAutoLayout( );
+		Random rand = new Random( );
+		StringBuilder output = new StringBuilder( );
+		LinkedList<double[]> nodesWithConnections = new LinkedList<double[]>( );
+		LinkedList<double[]> nodesWithoutConnections = new LinkedList<double[]>(Arrays.asList(nodeInfoStored));
 		connectionInfo = new int[nodeInfoStored.length][nodeInfoStored.length];
-		LinkedList<Line2D> roadsInSystem = new LinkedList<Line2D>();
-		int node1 = rand.nextInt(nodesWithoutConnections.size());
+		LinkedList<Line2D> roadsInSystem = new LinkedList<Line2D>( );
+		int node1 = rand.nextInt(nodesWithoutConnections.size( ));
 		double[] nodeWithoutConnection = nodesWithoutConnections.remove(node1);
-		int node2 = rand.nextInt(nodesWithoutConnections.size());
+		int node2 = rand.nextInt(nodesWithoutConnections.size( ));
 		double[] nodeWithoutConnection2 = nodesWithoutConnections.remove(node2);
 		int[] nextNode = blockedByFutureNode(200, nodeWithoutConnection, nodeWithoutConnection2, nodesWithoutConnections, nodesWithConnections);
 		int failedAmount = 0;
 		int spacingOfLines = 200;
-		while (nextNode[1]!=-1) 
+		while(nextNode[1] != - 1)
 		{
 			failedAmount++;
-			if(failedAmount>20&&spacingOfLines>1)
+			if(failedAmount > 20 && spacingOfLines > 1)
 			{
-				failedAmount=0;
+				failedAmount = 0;
 				spacingOfLines--;
 			}
 			nodesWithoutConnections.add(nodeWithoutConnection2);
 			nodeWithoutConnection2 = nodesWithoutConnections.remove(nextNode[1]);
 			nextNode = blockedByFutureNode(spacingOfLines, nodeWithoutConnection, nodeWithoutConnection2, nodesWithoutConnections, nodesWithConnections);
 		}
-		connectionInfo[(int)nodeWithoutConnection[3]][(int)nodeWithoutConnection2[3]] = 1;
-		connectionInfo[(int)nodeWithoutConnection2[3]][(int)nodeWithoutConnection[3]] = 1;
-		if(Config.HIGHESTSPEEDLIMIT==Config.LOWESTSPEEDLIMIT)
+		connectionInfo[(int) nodeWithoutConnection[3]][(int) nodeWithoutConnection2[3]] = 1;
+		connectionInfo[(int) nodeWithoutConnection2[3]][(int) nodeWithoutConnection[3]] = 1;
+		if(Config.HIGHESTSPEEDLIMIT == Config.LOWESTSPEEDLIMIT)
 		{
-			speedOfRoads[(int)nodeWithoutConnection2[3]][(int)nodeWithoutConnection[3]] = Config.HIGHESTSPEEDLIMIT;
+			speedOfRoads[(int) nodeWithoutConnection2[3]][(int) nodeWithoutConnection[3]] = Config.HIGHESTSPEEDLIMIT;
 		}
 		else
 		{
-			speedOfRoads[(int)nodeWithoutConnection2[3]][(int)nodeWithoutConnection[3]] = rand.nextInt(Config.HIGHESTSPEEDLIMIT-Config.LOWESTSPEEDLIMIT)+Config.LOWESTSPEEDLIMIT;
+			speedOfRoads[(int) nodeWithoutConnection2[3]][(int) nodeWithoutConnection[3]] = rand.nextInt(Config.HIGHESTSPEEDLIMIT - Config.LOWESTSPEEDLIMIT) + Config.LOWESTSPEEDLIMIT;
 		}
-		speedOfRoads[(int)nodeWithoutConnection[3]][(int)nodeWithoutConnection2[3]] = speedOfRoads[(int)nodeWithoutConnection2[3]][(int)nodeWithoutConnection[3]];
-		output.append((int)nodeWithoutConnection[3] + " " + (int)nodeWithoutConnection2[3] + " " + speedOfRoads[(int)nodeWithoutConnection2[3]][(int)nodeWithoutConnection[3]]);
-		graph.addEdge(nodeWithoutConnection[3]+" "+nodeWithoutConnection2[3], (int)nodeWithoutConnection[3]+"", (int)nodeWithoutConnection2[3]+"",true);
-		graph.addEdge(nodeWithoutConnection2[3]+" "+nodeWithoutConnection[3], (int)nodeWithoutConnection2[3]+"", (int)nodeWithoutConnection[3]+"",true);
-		roadsInSystem.add(new Line2D.Double(nodeWithoutConnection[0],nodeWithoutConnection[1],nodeWithoutConnection2[0],nodeWithoutConnection2[1]));
+		speedOfRoads[(int) nodeWithoutConnection[3]][(int) nodeWithoutConnection2[3]] = speedOfRoads[(int) nodeWithoutConnection2[3]][(int) nodeWithoutConnection[3]];
+		output.append((int) nodeWithoutConnection[3]).append(" ").append((int) nodeWithoutConnection2[3]).append(" ").append(speedOfRoads[(int) nodeWithoutConnection2[3]][(int) nodeWithoutConnection[3]]);
+		graph.addEdge(nodeWithoutConnection[3] + " " + nodeWithoutConnection2[3], (int) nodeWithoutConnection[3] + "", (int) nodeWithoutConnection2[3] + "", true);
+		graph.addEdge(nodeWithoutConnection2[3] + " " + nodeWithoutConnection[3], (int) nodeWithoutConnection2[3] + "", (int) nodeWithoutConnection[3] + "", true);
+		roadsInSystem.add(new Line2D.Double(nodeWithoutConnection[0], nodeWithoutConnection[1], nodeWithoutConnection2[0], nodeWithoutConnection2[1]));
 		nodesWithConnections.add(nodeWithoutConnection2);
 		nodesWithConnections.add(nodeWithoutConnection);
 		failedAmount = 0;
 		spacingOfLines = 200;
-		while(nodesWithoutConnections.size()>0)
+		while(nodesWithoutConnections.size( ) > 0)
 		{
-			node1 = rand.nextInt(nodesWithConnections.size());
-			double [] nodeWithConnection = nodesWithConnections.remove(node1);
-			node2 = rand.nextInt(nodesWithoutConnections.size());
+			node1 = rand.nextInt(nodesWithConnections.size( ));
+			double[] nodeWithConnection = nodesWithConnections.remove(node1);
+			node2 = rand.nextInt(nodesWithoutConnections.size( ));
 			nodeWithoutConnection = nodesWithoutConnections.remove(node2);
-			if(!blockedByRoad(nodeWithConnection,nodeWithoutConnection,roadsInSystem))
+			if(notBlockedByRoad(nodeWithConnection, nodeWithoutConnection, roadsInSystem))
 			{
 				nextNode = blockedByFutureNode(200, nodeWithConnection, nodeWithoutConnection, nodesWithoutConnections, nodesWithConnections);
-				while (nextNode[1]!=-1) 
+				while(nextNode[1] != - 1)
 				{
 					failedAmount++;
-					if(failedAmount>20&&spacingOfLines>1)
+					if(failedAmount > 20 && spacingOfLines > 1)
 					{
-						failedAmount=0;
+						failedAmount = 0;
 						spacingOfLines--;
 					}
-					if(nextNode[0]==0)
+					if(nextNode[0] == 0)
 					{
 						nodesWithoutConnections.add(nodeWithoutConnection);
 						nodeWithoutConnection = nodesWithoutConnections.remove(nextNode[1]);
-						nextNode = blockedByFutureNode(spacingOfLines, nodeWithConnection, nodeWithoutConnection, nodesWithoutConnections,nodesWithConnections);
+						nextNode = blockedByFutureNode(spacingOfLines, nodeWithConnection, nodeWithoutConnection, nodesWithoutConnections, nodesWithConnections);
 					}
 					else
 					{
 						nodesWithConnections.add(nodeWithConnection);
 						nodeWithConnection = nodesWithConnections.remove(nextNode[1]);
-						nextNode = blockedByFutureNode(spacingOfLines, nodeWithConnection, nodeWithoutConnection, nodesWithoutConnections,nodesWithConnections);
+						nextNode = blockedByFutureNode(spacingOfLines, nodeWithConnection, nodeWithoutConnection, nodesWithoutConnections, nodesWithConnections);
 					}
 				}
 				failedAmount = 0;
 				nodesWithConnections.add(nodeWithoutConnection);
 				nodesWithConnections.add(nodeWithConnection);
-				roadsInSystem.add(new Line2D.Double(nodeWithConnection[0],nodeWithConnection[1],nodeWithoutConnection[0],nodeWithoutConnection[1]));
-				connectionInfo[(int)nodeWithConnection[3]][(int)nodeWithoutConnection[3]] = 1;
-				connectionInfo[(int)nodeWithoutConnection[3]][(int)nodeWithConnection[3]] = 1;
-				Edge newEdge = graph.addEdge(nodeWithoutConnection[3]+" "+nodeWithConnection[3], (int)nodeWithoutConnection[3]+"", (int)nodeWithConnection[3]+"",true);
-				newEdge = graph.addEdge(nodeWithConnection[3]+" "+nodeWithoutConnection[3], (int)nodeWithConnection[3]+"", (int)nodeWithoutConnection[3]+"",true);
-				if(Config.HIGHESTSPEEDLIMIT==Config.LOWESTSPEEDLIMIT)
+				roadsInSystem.add(new Line2D.Double(nodeWithConnection[0], nodeWithConnection[1], nodeWithoutConnection[0], nodeWithoutConnection[1]));
+				connectionInfo[(int) nodeWithConnection[3]][(int) nodeWithoutConnection[3]] = 1;
+				connectionInfo[(int) nodeWithoutConnection[3]][(int) nodeWithConnection[3]] = 1;
+				Edge newEdge = graph.addEdge(nodeWithConnection[3] + " " + nodeWithoutConnection[3], (int) nodeWithConnection[3] + "", (int) nodeWithoutConnection[3] + "", true);
+				if(Config.HIGHESTSPEEDLIMIT == Config.LOWESTSPEEDLIMIT)
 				{
-					speedOfRoads[(int)nodeWithConnection[3]][(int)nodeWithoutConnection[3]] = Config.HIGHESTSPEEDLIMIT;
+					speedOfRoads[(int) nodeWithConnection[3]][(int) nodeWithoutConnection[3]] = Config.HIGHESTSPEEDLIMIT;
 				}
 				else
 				{
-					speedOfRoads[(int)nodeWithConnection[3]][(int)nodeWithoutConnection[3]] = rand.nextInt(Config.HIGHESTSPEEDLIMIT-Config.LOWESTSPEEDLIMIT)+Config.LOWESTSPEEDLIMIT;
+					speedOfRoads[(int) nodeWithConnection[3]][(int) nodeWithoutConnection[3]] = rand.nextInt(Config.HIGHESTSPEEDLIMIT - Config.LOWESTSPEEDLIMIT) + Config.LOWESTSPEEDLIMIT;
 				}
-				speedOfRoads[(int)nodeWithoutConnection[3]][(int)nodeWithConnection[3]] = speedOfRoads[(int)nodeWithConnection[3]][(int)nodeWithoutConnection[3]];
-				output.append("\n"+(int)nodeWithConnection[3] + " " + (int)nodeWithoutConnection[3] + " " + speedOfRoads[(int)nodeWithConnection[3]][(int)nodeWithoutConnection[3]]);
+				speedOfRoads[(int) nodeWithoutConnection[3]][(int) nodeWithConnection[3]] = speedOfRoads[(int) nodeWithConnection[3]][(int) nodeWithoutConnection[3]];
+				output.append("\n").append((int) nodeWithConnection[3]).append(" ").append((int) nodeWithoutConnection[3]).append(" ").append(speedOfRoads[(int) nodeWithConnection[3]][(int) nodeWithoutConnection[3]]);
 				newEdge.setAttribute("layout.weight", 2);
 			}
 			else
@@ -1172,301 +1168,266 @@ public class FinalYear
 				nodesWithoutConnections.add(nodeWithoutConnection);
 			}
 		}
-		if(Config.MAPTWEAK == true)
+		if(Config.MAPTWEAK)
 		{
-			Scanner in = new Scanner(System.in);
-			String finished = in.next();
-			double smallestDoubleX = Double.MAX_VALUE-1;
-			double largestDoubleX = -Double.MAX_VALUE;
-			double smallestDoubleY = Double.MAX_VALUE-1;
-			double largestDoubleY = -Double.MAX_VALUE;
-			for (int i = 0; i < nodeInfoStored.length; i++) 
+			double smallestDoubleX = Double.MAX_VALUE - 1;
+			double largestDoubleX = - Double.MAX_VALUE;
+			double smallestDoubleY = Double.MAX_VALUE - 1;
+			double largestDoubleY = - Double.MAX_VALUE;
+			for(int i = 0; i < nodeInfoStored.length; i++)
 			{
-				GraphicNode theNodeGraphic = viewer.getGraphicGraph().getNode(i+"");
-				if(smallestDoubleX>theNodeGraphic.getX())
+				GraphicNode theNodeGraphic = viewer.getGraphicGraph( ).getNode(i + "");
+				if(smallestDoubleX > theNodeGraphic.getX( ))
 				{
-					smallestDoubleX = theNodeGraphic.getX();
+					smallestDoubleX = theNodeGraphic.getX( );
 				}
-				if(largestDoubleX<theNodeGraphic.getX())
+				if(largestDoubleX < theNodeGraphic.getX( ))
 				{
-					largestDoubleX = theNodeGraphic.getX();
+					largestDoubleX = theNodeGraphic.getX( );
 				}
-				if(smallestDoubleY>theNodeGraphic.getY())
+				if(smallestDoubleY > theNodeGraphic.getY( ))
 				{
-					smallestDoubleY = theNodeGraphic.getY();
+					smallestDoubleY = theNodeGraphic.getY( );
 				}
-				if(largestDoubleY<theNodeGraphic.getY())
+				if(largestDoubleY < theNodeGraphic.getY( ))
 				{
-					largestDoubleY = theNodeGraphic.getY();
+					largestDoubleY = theNodeGraphic.getY( );
 				}
 			}
-			double scaleX = Config.MAPSIZEX/(largestDoubleX-smallestDoubleX);
-			double scaleY = Config.MAPSIZEY/(largestDoubleY-smallestDoubleY);
-			for (int i = 0; i < nodeInfoStored.length; i++) 
+			double scaleX = Config.MAPSIZEX / (largestDoubleX - smallestDoubleX);
+			double scaleY = Config.MAPSIZEY / (largestDoubleY - smallestDoubleY);
+			for(int i = 0; i < nodeInfoStored.length; i++)
 			{
-				GraphicNode theNodeGraphic = viewer.getGraphicGraph().getNode(i+"");
-				theNodeGraphic.setAttribute("xyz", (theNodeGraphic.getX()-smallestDoubleX)*scaleX,(theNodeGraphic.getY()-smallestDoubleY)*scaleY,0);
-				nodeInfoStored[i][0]=theNodeGraphic.getX();
-				nodeInfoStored[i][1]=theNodeGraphic.getY();
+				GraphicNode theNodeGraphic = viewer.getGraphicGraph( ).getNode(i + "");
+				theNodeGraphic.setAttribute("xyz", (theNodeGraphic.getX( ) - smallestDoubleX) * scaleX, (theNodeGraphic.getY( ) - smallestDoubleY) * scaleY, 0);
+				nodeInfoStored[i][0] = theNodeGraphic.getX( );
+				nodeInfoStored[i][1] = theNodeGraphic.getY( );
 			}
 		}
-		roadsInSystem.clear();
-		int[] amountOfConnections = new int[connectionInfo.length];
+		roadsInSystem.clear( );
 		int maxConnections = 0;
-		for (int i = 0; i < connectionInfo.length; i++) 
+		for(int i = 0; i < connectionInfo.length; i++)
 		{
 			int amountOfConnectionsForNode = 0;
-			for (int j = 0; j < connectionInfo.length; j++) 
+			for(int j = 0; j < connectionInfo.length; j++)
 			{
-				if(connectionInfo[i][j]==1)
+				if(connectionInfo[i][j] == 1)
 				{
 					amountOfConnectionsForNode++;
 				}
-				if(connectionInfo[i][j]==1&&j>i)
+				if(connectionInfo[i][j] == 1 && j > i)
 				{
-					roadsInSystem.add(new Line2D.Double(nodeInfoStored[i][0],nodeInfoStored[i][1],nodeInfoStored[j][0],nodeInfoStored[j][1]));
+					roadsInSystem.add(new Line2D.Double(nodeInfoStored[i][0], nodeInfoStored[i][1], nodeInfoStored[j][0], nodeInfoStored[j][1]));
 				}
 			}
-			nodeInfoStored[i][4]=amountOfConnectionsForNode;
-			if(amountOfConnectionsForNode>maxConnections)
+			nodeInfoStored[i][4] = amountOfConnectionsForNode;
+			if(amountOfConnectionsForNode > maxConnections)
 			{
 				maxConnections = amountOfConnectionsForNode;
 			}
 		}
-		LinkedList<LinkedList<double[]>> listOfNodesInOrder = new LinkedList<LinkedList<double[]>>();
-		for (int i = 0; i < maxConnections; i++) 
+		LinkedList<LinkedList<double[]>> listOfNodesInOrder = new LinkedList<LinkedList<double[]>>( );
+		for(int i = 0; i < maxConnections; i++)
 		{
-			listOfNodesInOrder.add(new LinkedList<double[]>());
+			listOfNodesInOrder.add(new LinkedList<double[]>( ));
 		}
-		for (int i = 0; i < nodeInfoStored.length; i++) 
+		for(double[] currentNode : nodeInfoStored)
 		{
-			double[] currentNode = nodeInfoStored[i];
-			listOfNodesInOrder.get((int)currentNode[4]-1).add(currentNode);
+			listOfNodesInOrder.get((int) currentNode[4] - 1).add(currentNode);
 		}
 		int index1 = 0;
 		int index2 = 0;
 		int amountToCheckInitial = 3;
-		int SpacingDistance = 1;
-		while (index1<listOfNodesInOrder.size()&&index2<listOfNodesInOrder.size()&&index1 < amountToCheckInitial && roadsInSystem.size() < Config.AMOUNTOFROADS)
+		while(index1 < listOfNodesInOrder.size( ) && index2 < listOfNodesInOrder.size( ) && index1 < amountToCheckInitial && roadsInSystem.size( ) < Config.AMOUNTOFROADS)
 		{
 			LinkedList<double[]> currentLinkedList = listOfNodesInOrder.get(index1);
 			LinkedList<double[]> currentLinkedList2 = listOfNodesInOrder.get(index2);
 			int index3 = 0;
-			int index4 = 0;
-			//System.out.println(index1 + " ," + index2);
-			while (index3 < currentLinkedList.size() && roadsInSystem.size() < Config.AMOUNTOFROADS) 
+			int index4;
+			while(index3 < currentLinkedList.size( ) && roadsInSystem.size( ) < Config.AMOUNTOFROADS)
 			{
 				double[] currentNode = currentLinkedList.get(index3);
 				boolean added = false;
-				for (index4 = 0; index4 < currentLinkedList2.size(); index4++) 
+				for(index4 = 0; index4 < currentLinkedList2.size( ); index4++)
 				{
 					double[] currentNode2 = currentLinkedList2.get(index4);
-					if (!currentNode2.equals(currentNode)) 
+					if(! currentNode2.equals(currentNode))
 					{
-						//System.out.println("tried to add connection between " + currentNode[3] + " and " + currentNode2[3]);
-						if (blockedByRoad(currentNode, currentNode2,roadsInSystem) == false) 
+						if(notBlockedByRoad(currentNode, currentNode2, roadsInSystem))
 						{
-							if(connectionInfo[(int)currentNode[3]][(int)currentNode2[3]]==0&&blockedByFutureNode(Config.SPREADDISTANCE, currentNode,currentNode2,nodesWithoutConnections,nodesWithConnections)[1]==-1)
+							if(connectionInfo[(int) currentNode[3]][(int) currentNode2[3]] == 0 && blockedByFutureNode(Config.SPREADDISTANCE, currentNode, currentNode2, nodesWithoutConnections, nodesWithConnections)[1] == - 1)
 							{
-								if(connectionInfo[(int)currentNode[3]][(int)currentNode2[3]] != 1)
+								if(connectionInfo[(int) currentNode[3]][(int) currentNode2[3]] != 1)
 								{
-									roadsInSystem.add(new Line2D.Double(currentNode[0],currentNode[1],currentNode2[0],currentNode2[1]));
+									roadsInSystem.add(new Line2D.Double(currentNode[0], currentNode[1], currentNode2[0], currentNode2[1]));
 									currentNode[4]++;
 									currentNode2[4]++;
-									connectionInfo[(int)currentNode[3]][(int)currentNode2[3]] = 1;
-									connectionInfo[(int)currentNode2[3]][(int)currentNode[3]] = 1;
-									index4--;
-									graph.addEdge(currentNode[3]+" "+currentNode2[3], (int)currentNode[3]+"", (int)currentNode2[3]+"",true);
-									graph.addEdge(currentNode2[3]+" "+currentNode[3], (int)currentNode2[3]+"", (int)currentNode[3]+"",true);
-									if(Config.HIGHESTSPEEDLIMIT==Config.LOWESTSPEEDLIMIT)
+									connectionInfo[(int) currentNode[3]][(int) currentNode2[3]] = 1;
+									connectionInfo[(int) currentNode2[3]][(int) currentNode[3]] = 1;
+									graph.addEdge(currentNode[3] + " " + currentNode2[3], (int) currentNode[3] + "", (int) currentNode2[3] + "", true);
+									graph.addEdge(currentNode2[3] + " " + currentNode[3], (int) currentNode2[3] + "", (int) currentNode[3] + "", true);
+									if(Config.HIGHESTSPEEDLIMIT == Config.LOWESTSPEEDLIMIT)
 									{
-										speedOfRoads[(int)currentNode[3]][(int)currentNode2[3]] = Config.HIGHESTSPEEDLIMIT;
+										speedOfRoads[(int) currentNode[3]][(int) currentNode2[3]] = Config.HIGHESTSPEEDLIMIT;
 									}
 									else
 									{
-										speedOfRoads[(int)currentNode[3]][(int)currentNode2[3]] = rand.nextInt(Config.HIGHESTSPEEDLIMIT-Config.LOWESTSPEEDLIMIT)+Config.LOWESTSPEEDLIMIT;
+										speedOfRoads[(int) currentNode[3]][(int) currentNode2[3]] = rand.nextInt(Config.HIGHESTSPEEDLIMIT - Config.LOWESTSPEEDLIMIT) + Config.LOWESTSPEEDLIMIT;
 									}
-									speedOfRoads[(int)currentNode2[3]][(int)currentNode[3]] = speedOfRoads[(int)currentNode[3]][(int)currentNode2[3]];
-									output.append("\n"+(int)currentNode[3] + " " + (int)currentNode2[3] + " " + speedOfRoads[(int)currentNode[3]][(int)currentNode2[3]]);
+									speedOfRoads[(int) currentNode2[3]][(int) currentNode[3]] = speedOfRoads[(int) currentNode[3]][(int) currentNode2[3]];
+									output.append("\n").append((int) currentNode[3]).append(" ").append((int) currentNode2[3]).append(" ").append(speedOfRoads[(int) currentNode[3]][(int) currentNode2[3]]);
 									listOfNodesInOrder.get(index1).remove(currentNode);
 									listOfNodesInOrder.get(index2).remove(currentNode2);
-									if (currentNode[4]> listOfNodesInOrder.size() - 1 || currentNode2[4] > listOfNodesInOrder.size() - 1) 
+									if(currentNode[4] > listOfNodesInOrder.size( ) - 1 || currentNode2[4] > listOfNodesInOrder.size( ) - 1)
 									{
-										listOfNodesInOrder.addLast(new LinkedList<double[]>());
+										listOfNodesInOrder.addLast(new LinkedList<double[]>( ));
 									}
-									listOfNodesInOrder.get(index1+1).add(currentNode);
-									listOfNodesInOrder.get(index2+1).add(currentNode2);
-									added=true;
+									listOfNodesInOrder.get(index1 + 1).add(currentNode);
+									listOfNodesInOrder.get(index2 + 1).add(currentNode2);
+									added = true;
 									break;
 								}
-							}
-							else
-							{
-								
 							}
 						}
 					}
 				}
-				if(added != true)
+				if(! added)
 				{
 					index3++;
 				}
 			}
-			if (index2 < amountToCheckInitial - 1) {
+			if(index2 < amountToCheckInitial - 1)
+			{
 				index2++;
-			} else {
+			}
+			else
+			{
 				index1++;
 				index2 = index1;
 			}
 		}
 		index1 = 0;
 		index2 = 3;
-		while (index2 < listOfNodesInOrder.size() && roadsInSystem.size() < Config.AMOUNTOFROADS) 
+		while(index2 < listOfNodesInOrder.size( ) && roadsInSystem.size( ) < Config.AMOUNTOFROADS)
 		{
-			while (index1 <= index2 && roadsInSystem.size() < Config.AMOUNTOFROADS) 
+			while(index1 <= index2 && roadsInSystem.size( ) < Config.AMOUNTOFROADS)
 			{
 				LinkedList<double[]> currentLinkedList = listOfNodesInOrder.get(index1);
 				LinkedList<double[]> currentLinkedList2 = listOfNodesInOrder.get(index2);
 				int index3 = 0;
-				int index4 = 0;
-				//System.out.println(index1 + " ," + index2);
-				while (index3 < currentLinkedList.size() && roadsInSystem.size() < Config.AMOUNTOFROADS) 
+				int index4;
+				while(index3 < currentLinkedList.size( ) && roadsInSystem.size( ) < Config.AMOUNTOFROADS)
 				{
 					double[] currentNode = currentLinkedList.get(index3);
 					boolean added = false;
-					for (index4 = 0; index4 < currentLinkedList2.size(); index4++) 
+					for(index4 = 0; index4 < currentLinkedList2.size( ); index4++)
 					{
 						double[] currentNode2 = currentLinkedList2.get(index4);
-						if (!currentNode2.equals(currentNode)) 
+						if(! currentNode2.equals(currentNode))
 						{
-							//System.out.println("tried to add connection between " + currentNode[3] + " and " + currentNode2[3]);
-							if (blockedByRoad(currentNode, currentNode2,roadsInSystem) == false) 
+							if(notBlockedByRoad(currentNode, currentNode2, roadsInSystem))
 							{
-								if(connectionInfo[(int)currentNode[3]][(int)currentNode2[3]]==0&&blockedByFutureNode(Config.SPREADDISTANCE, currentNode,currentNode2,nodesWithoutConnections,nodesWithConnections)[1]==-1)
+								if(connectionInfo[(int) currentNode[3]][(int) currentNode2[3]] == 0 && blockedByFutureNode(Config.SPREADDISTANCE, currentNode, currentNode2, nodesWithoutConnections, nodesWithConnections)[1] == - 1)
 								{
-									if(connectionInfo[(int)currentNode[3]][(int)currentNode2[3]] != 1)
+									if(connectionInfo[(int) currentNode[3]][(int) currentNode2[3]] != 1)
 									{
-										roadsInSystem.add(new Line2D.Double(currentNode[0],currentNode[1],currentNode2[0],currentNode2[1]));
+										roadsInSystem.add(new Line2D.Double(currentNode[0], currentNode[1], currentNode2[0], currentNode2[1]));
 										currentNode[4]++;
 										currentNode2[4]++;
-										index4--;
-										connectionInfo[(int)currentNode[3]][(int)currentNode2[3]] = 1;
-										connectionInfo[(int)currentNode2[3]][(int)currentNode[3]] = 1;
-										graph.addEdge(currentNode[3]+" "+currentNode2[3], (int)currentNode[3]+"", (int)currentNode2[3]+"",true);
-										graph.addEdge(currentNode2[3]+" "+currentNode[3], (int)currentNode2[3]+"", (int)currentNode[3]+"",true);
-										if(Config.HIGHESTSPEEDLIMIT==Config.LOWESTSPEEDLIMIT)
+										connectionInfo[(int) currentNode[3]][(int) currentNode2[3]] = 1;
+										connectionInfo[(int) currentNode2[3]][(int) currentNode[3]] = 1;
+										graph.addEdge(currentNode[3] + " " + currentNode2[3], (int) currentNode[3] + "", (int) currentNode2[3] + "", true);
+										graph.addEdge(currentNode2[3] + " " + currentNode[3], (int) currentNode2[3] + "", (int) currentNode[3] + "", true);
+										if(Config.HIGHESTSPEEDLIMIT == Config.LOWESTSPEEDLIMIT)
 										{
-											speedOfRoads[(int)currentNode[3]][(int)currentNode2[3]] = Config.HIGHESTSPEEDLIMIT;
+											speedOfRoads[(int) currentNode[3]][(int) currentNode2[3]] = Config.HIGHESTSPEEDLIMIT;
 										}
 										else
 										{
-											speedOfRoads[(int)currentNode[3]][(int)currentNode2[3]] = rand.nextInt(Config.HIGHESTSPEEDLIMIT-Config.LOWESTSPEEDLIMIT)+Config.LOWESTSPEEDLIMIT;
+											speedOfRoads[(int) currentNode[3]][(int) currentNode2[3]] = rand.nextInt(Config.HIGHESTSPEEDLIMIT - Config.LOWESTSPEEDLIMIT) + Config.LOWESTSPEEDLIMIT;
 										}
-										speedOfRoads[(int)currentNode2[3]][(int)currentNode[3]] = speedOfRoads[(int)currentNode[3]][(int)currentNode2[3]];
-										output.append("\n"+(int)currentNode[3] + " " + (int)currentNode2[3] + " " + speedOfRoads[(int)currentNode[3]][(int)currentNode2[3]]);
+										speedOfRoads[(int) currentNode2[3]][(int) currentNode[3]] = speedOfRoads[(int) currentNode[3]][(int) currentNode2[3]];
+										output.append("\n").append((int) currentNode[3]).append(" ").append((int) currentNode2[3]).append(" ").append(speedOfRoads[(int) currentNode[3]][(int) currentNode2[3]]);
 										listOfNodesInOrder.get(index1).remove(currentNode);
 										listOfNodesInOrder.get(index2).remove(currentNode2);
-										if (currentNode[4]> listOfNodesInOrder.size() - 1 || currentNode2[4] > listOfNodesInOrder.size() - 1) 
+										if(currentNode[4] > listOfNodesInOrder.size( ) - 1 || currentNode2[4] > listOfNodesInOrder.size( ) - 1)
 										{
-											listOfNodesInOrder.addLast(new LinkedList<double[]>());
+											listOfNodesInOrder.addLast(new LinkedList<double[]>( ));
 										}
-										listOfNodesInOrder.get(index1+1).add(currentNode);
-										listOfNodesInOrder.get(index2+1).add(currentNode2);
-										added=true;
+										listOfNodesInOrder.get(index1 + 1).add(currentNode);
+										listOfNodesInOrder.get(index2 + 1).add(currentNode2);
+										added = true;
 										break;
 									}
 								}
 							}
 						}
 					}
-					if(added != true)
+					if(! added)
 					{
 						index3++;
 					}
 				}
 				index1++;
 			}
-			if (index2 < listOfNodesInOrder.size()) {
+			if(index2 < listOfNodesInOrder.size( ))
+			{
 				index2++;
 				index1 = 0;
 			}
 		}
-		roadFile = new AppendToFile(roadsConfig+prefixConfig+"\\test"+currentRunthrough+"\\roads.txt");
-		roadFile.cleanFile();
-		roadFile.openWriterAppend();
+		roadFile = new AppendToFile(roadsConfig + prefixConfig + "/test" + currentRunthrough + "/roads.txt");
+		roadFile.cleanFile( );
+		roadFile.openWriterAppend( );
 		roadFile.appendToFile(output);
-		roadFile.closeWriterAppend();
-		
+		roadFile.closeWriterAppend( );
 	}
 	
-	private static boolean blockedByRoad(double[] nodeWithConnection, double[] nodeWithoutConnection, LinkedList<Line2D> linesInSystem) 
+	private static boolean notBlockedByRoad(double[] nodeWithConnection, double[] nodeWithoutConnection, LinkedList<Line2D> linesInSystem)
 	{
-		Line2D possibleLine = new Line2D.Double(nodeWithConnection[0],nodeWithConnection[1],nodeWithoutConnection[0],nodeWithoutConnection[1]);
-		for (int i = 0; i < linesInSystem.size(); i++) 
+		Line2D possibleLine = new Line2D.Double(nodeWithConnection[0], nodeWithConnection[1], nodeWithoutConnection[0], nodeWithoutConnection[1]);
+		for(Line2D aLinesInSystem : linesInSystem)
 		{
-			if (!((linesInSystem.get(i).getX1()==possibleLine.getX1()&&linesInSystem.get(i).getY1()==possibleLine.getY1())
-					||(linesInSystem.get(i).getX2()==possibleLine.getX2()&&linesInSystem.get(i).getY2()==possibleLine.getY2())
-					||(linesInSystem.get(i).getX1()==possibleLine.getX2()&&linesInSystem.get(i).getY1()==possibleLine.getY2())
-					||(linesInSystem.get(i).getX2()==possibleLine.getX1()&&linesInSystem.get(i).getY2()==possibleLine.getY1())))
+			if(! ((aLinesInSystem.getX1( ) == possibleLine.getX1( ) && aLinesInSystem.getY1( ) == possibleLine.getY1( )) || (aLinesInSystem.getX2( ) == possibleLine.getX2( ) && aLinesInSystem.getY2( ) == possibleLine.getY2( )) || (aLinesInSystem.getX1( ) == possibleLine.getX2( ) && aLinesInSystem.getY1( ) == possibleLine.getY2( )) || (aLinesInSystem.getX2( ) == possibleLine.getX1( ) && aLinesInSystem.getY2( ) == possibleLine.getY1( ))))
 			{
-				if (linesInSystem.get(i).intersectsLine(possibleLine)) 
+				if(aLinesInSystem.intersectsLine(possibleLine))
 				{
-					return true;
+					return false;
 				}
 			}
 		}
-		return false;
+		return true;
 	}
 	
-	private static int[] blockedByFutureNode(int distance, double[] nodeWithoutConnection, double[] nodeWithoutConnection2, LinkedList<double[]> nodesWithoutConnections, LinkedList<double[]> nodesWithConnections) 
+	private static int[] blockedByFutureNode(int distance, double[] nodeWithoutConnection, double[] nodeWithoutConnection2, LinkedList<double[]> nodesWithoutConnections, LinkedList<double[]> nodesWithConnections)
 	{
-		Line2D possibleLine = new Line2D.Double(nodeWithoutConnection[0],nodeWithoutConnection[1],nodeWithoutConnection2[0],nodeWithoutConnection2[1]);
-		for (int i = 0; i < nodesWithoutConnections.size(); i++) {
+		Line2D possibleLine = new Line2D.Double(nodeWithoutConnection[0], nodeWithoutConnection[1], nodeWithoutConnection2[0], nodeWithoutConnection2[1]);
+		for(int i = 0; i < nodesWithoutConnections.size( ); i++)
+		{
 			double[] currentCheck = nodesWithoutConnections.get(i);
-			if (!((currentCheck[0]==possibleLine.getX1()&&currentCheck[1]==possibleLine.getY1())
-					||(currentCheck[0]==possibleLine.getX2()&&currentCheck[1]==possibleLine.getY2())
-					||(currentCheck[0]==possibleLine.getX2()&&currentCheck[1]==possibleLine.getY2())
-					||(currentCheck[0]==possibleLine.getX1()&&currentCheck[1]==possibleLine.getY1()))&&
-					possibleLine.ptSegDist(currentCheck[0], currentCheck[1])<distance)
+			if(! ((currentCheck[0] == possibleLine.getX1( ) && currentCheck[1] == possibleLine.getY1( )) || (currentCheck[0] == possibleLine.getX2( ) && currentCheck[1] == possibleLine.getY2( )) || (currentCheck[0] == possibleLine.getX2( ) && currentCheck[1] == possibleLine.getY2( )) || (currentCheck[0] == possibleLine.getX1( ) && currentCheck[1] == possibleLine.getY1( ))) && possibleLine.ptSegDist(currentCheck[0], currentCheck[1]) < distance)
 			{
-				return new int[]{0,i};
+				return new int[]{0, i};
 			}
 		}
-		for (int i = 0; i < nodesWithConnections.size(); i++) {
+		for(int i = 0; i < nodesWithConnections.size( ); i++)
+		{
 			double[] currentCheck = nodesWithConnections.get(i);
-			if (!((currentCheck[0]==possibleLine.getX1()&&currentCheck[1]==possibleLine.getY1())
-					||(currentCheck[0]==possibleLine.getX2()&&currentCheck[1]==possibleLine.getY2())
-					||(currentCheck[0]==possibleLine.getX2()&&currentCheck[1]==possibleLine.getY2())
-					||(currentCheck[0]==possibleLine.getX1()&&currentCheck[1]==possibleLine.getY1()))&&
-					possibleLine.ptSegDist(currentCheck[0], currentCheck[1])<distance)
+			if(! ((currentCheck[0] == possibleLine.getX1( ) && currentCheck[1] == possibleLine.getY1( )) || (currentCheck[0] == possibleLine.getX2( ) && currentCheck[1] == possibleLine.getY2( )) || (currentCheck[0] == possibleLine.getX2( ) && currentCheck[1] == possibleLine.getY2( )) || (currentCheck[0] == possibleLine.getX1( ) && currentCheck[1] == possibleLine.getY1( ))) && possibleLine.ptSegDist(currentCheck[0], currentCheck[1]) < distance)
 			{
-				return new int[]{1,i};
+				return new int[]{1, i};
 			}
 		}
-		return new int[]{0,-1};
+		return new int[]{0, - 1};
 	}
-
-	public static int getTimestep() {
+	
+	private static int getTimestep()
+	{
 		return timestep;
 	}
-
-	public static void setTimestep(int timestep) {
+	
+	private static void setTimestep(int timestep)
+	{
 		FinalYear.timestep = timestep;
 	}
-}
-
-class compareRoadAngles implements Comparator<Road>
-{
-	@Override
-	public int compare(Road o1, Road o2) {
-		if(o1.getAngleOfRoad()<o2.getAngleOfRoad())
-		{
-			return 1;
-		}
-		else
-		{
-			return -1;
-		}
-	}
-	
 }

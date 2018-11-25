@@ -1,12 +1,16 @@
-import java.util.Comparator;
+package com.company.Other;
+
+import com.company.HelperObjects.RoadAndWeight;
+import com.company.SearchMethods.*;
+
 import java.util.LinkedList;
 import java.util.Random;
 import java.util.TreeSet;
 
 public class UserInputFile
 {
-	static Random rand = new Random( );
-	static SearchTechniques searchTechnique;
+	private static final Random rand = new Random( );
+	private static SearchTechniques searchTechnique;
 	
 	public static void initialiseSearchStrategy()
 	{
@@ -63,7 +67,7 @@ public class UserInputFile
 		double lowestWeight = Double.MAX_VALUE / 2;
 		LinkedList<Road> listOfRoadsToReset = new LinkedList<Road>( );
 		LinkedList<Road> connectionsToCurrentRoad = currentRoad.getGoingTo( ).validRoads(currentRoad);
-		TreeSet<RoadAndWeight> ListOfRoadsInOrder = new TreeSet<RoadAndWeight>(new SortOutNextWeight( ));
+		TreeSet<RoadAndWeight> ListOfRoadsInOrder = new TreeSet<RoadAndWeight>( );
 		searchTechnique.selectWeightStrategyInit(currentRoad, connectionsToCurrentRoad, ListOfRoadsInOrder, listOfRoadsToReset, endRoad);
 		if(ListOfRoadsInOrder.size( ) == 1)
 		{
@@ -117,7 +121,6 @@ public class UserInputFile
 				RoadAndWeight temp = chosenRoads.poll( );
 				if(temp.amountOfCarsOnJourney == lowestAmountOfCars)
 				{
-					lowestAmountOfCars = temp.amountOfCarsOnJourney;
 					exitRoad.add(temp.firstChosenRoad);
 				}
 				if(temp.amountOfCarsOnJourney < lowestAmountOfCars)
@@ -135,45 +138,5 @@ public class UserInputFile
 		}
 	}
 	
-	public static Road getNextRoadDeadlockPreventionRoundabout(Road road, Road exitRoad, Car carOnRoundabout)
-	{
-		return null;
-	}
-	
-	public static Road getNextRoadDeadlockPreventionCrossroads(Road currentRoad, Road road, Car car)
-	{
-		return null;
-	}
-	
-	public static Road getNextRoadDeadlockPreventionTjunction(Road currentRoad, Road road, Car car)
-	{
-		return null;
-	}
-	
-	public static void weightsOfEdgesAfterInitialization(Car car, Road road, String reason)
-	{
-		searchTechnique.weightsOfEdgesAfterInitialization(car, road, reason);
-	}
-	
-}
-
-class SortOutNextWeight implements Comparator<RoadAndWeight>
-{
-	@Override
-	public int compare(RoadAndWeight o1, RoadAndWeight o2)
-	{
-		if(o1.equals(o2))
-		{
-			return 0;
-		}
-		if (o1.weightOfRoad > o2.weightOfRoad)
-		{
-			return 1;
-		}
-		else if (o1.weightOfRoad <= o2.weightOfRoad)
-		{
-			return -1;
-		}
-		return 0;
-	}
+	public static void weightsOfEdgesAfterInitialization(Car car, Road road, String reason) { searchTechnique.weightsOfEdgesAfterInitialization(car, road, reason); }
 }

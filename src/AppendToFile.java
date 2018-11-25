@@ -1,32 +1,30 @@
-import java.io.BufferedWriter;
+package com.company.Other;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
 
-public class AppendToFile
+class AppendToFile
 {
-	public String filePath;
-	BufferedWriter bw;
-	PrintWriter out;
-	FileWriter fw;
-	boolean fileWriterOpen = false;
-
+	private final String filePath;
+	private FileWriter fw;
+	private boolean fileWriterOpen = false;
+	
 	public AppendToFile(String file_path)
 	{
 		filePath = file_path;
 		File file = new File(filePath);
-		try 
+		try
 		{
-			file.createNewFile();
+			file.createNewFile( );
 			System.out.println("File created for " + file_path);
-	  	} 
-		catch (IOException e) 
+		}
+		catch(IOException e)
 		{
 			System.out.println("File already existed for " + file_path);
 		}
 	}
-
+	
 	public void openWriterAppend()
 	{
 		try
@@ -34,7 +32,7 @@ public class AppendToFile
 			fw = new FileWriter(filePath, true);
 			fileWriterOpen = true;
 		}
-		catch (IOException e)
+		catch(IOException e)
 		{
 			System.out.println("Failed to open writer to " + filePath);
 		}
@@ -45,9 +43,9 @@ public class AppendToFile
 		try
 		{
 			fileWriterOpen = false;
-			fw.close();
+			fw.close( );
 		}
-		catch (IOException e)
+		catch(IOException e)
 		{
 			System.out.println("Failed to close file writer for " + filePath);
 		}
@@ -57,32 +55,32 @@ public class AppendToFile
 	{
 		try
 		{
-			if(fileWriterOpen==false)
+			if(! fileWriterOpen)
 			{
 				fw = new FileWriter(filePath, true);
 			}
 			fw.append(a);
-			if(fileWriterOpen==false)
+			if(! fileWriterOpen)
 			{
-				fw.close();
+				fw.close( );
 			}
-		} 
-		catch (IOException e) 
+		}
+		catch(IOException e)
 		{
-		   System.out.println("Failed to append to file " + filePath);
+			System.out.println("Failed to append to file " + filePath);
 		}
 	}
 	
 	
 	public void cleanFile()
-	{	
+	{
 		try
 		{
 			FileWriter writer = new FileWriter(filePath, false);
 			writer.write("");
-			writer.close();
-		} 
-		catch (IOException e) 
+			writer.close( );
+		}
+		catch(IOException e)
 		{
 			System.out.println("Failed to clean file " + filePath);
 		}

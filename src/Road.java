@@ -1,159 +1,128 @@
+package com.company.Other;
+
+import com.company.HelperObjects.PointOnRoad;
+import com.company.Intersections.IntersectionAbstract;
+import org.graphstream.ui.spriteManager.Sprite;
+
 import java.util.Arrays;
 import java.util.LinkedList;
 
-import org.graphstream.graph.Edge;
-import org.graphstream.ui.spriteManager.Sprite;
-
-public class Road 
+public class Road implements Comparable<Road>
 {
-
-	private IntersectionAbstract goingFrom;
-	private IntersectionAbstract goingTo;
-	private double angleOfRoad;
-	private double distanceOfNode;
-	private double MaxSpeedOfCarsOnRoad;
-	private double[] weightOfRoad;
+	private final IntersectionAbstract goingFrom;
+	private final IntersectionAbstract goingTo;
+	private final double angleOfRoad;
+	private final double distanceOfNode;
+	private final double MaxSpeedOfCarsOnRoad;
+	private final double[] weightOfRoad;
 	private double[] averageTimesOnIntersection;
-	private int[] amountOfAvg,emptyArrayForUserAmountAdded;
+	private int[] amountOfAvg;
 	private char typeOfRoad = 'N';
 	private double spacingX = 0;
 	private double spacingY = 0;
-	@SuppressWarnings("unused")
-	private Edge roadRepresentation;
-	private LinkedList<Car> carsOnRoad = new LinkedList<Car>();
-	private double differenceX;
-	private double differenceY;
+	private final LinkedList<Car> carsOnRoad = new LinkedList<Car>( );
+	private final double differenceX;
+	private final double differenceY;
 	private char colorOfCarsOnRoad;
 	public boolean hasBeenChecked;
-	public double[] emptyArrayForUser;
 	public double[] maxArrayForUser;
 	public double[] minArrayForUser;
-	public Road(IntersectionAbstract intersectionAbstract, IntersectionAbstract intersectionAbstract2, double anglesBetweenNodes, double distances, double speedOfRoads, Edge edge, char colorOfCarsOnRoad) 
+	
+	public Road(IntersectionAbstract intersectionAbstract, IntersectionAbstract intersectionAbstract2, double anglesBetweenNodes, double distances, double speedOfRoads, char colorOfCarsOnRoad)
 	{
 		hasBeenChecked = false;
-		if(intersectionAbstract2.getClass().equals(Roundabout.class)||intersectionAbstract2.getClass().equals(ClosedRoad.class))
+		int[] emptyArrayForUserAmountAdded;
+		double[] emptyArrayForUser;
+		int internalBuffer = intersectionAbstract2.getInternalBuffer( );
+		if(Config.UPDATEAVERAGETIME)
 		{
-			if(Config.UPDATEAVERAGETIME)
-			{
-				averageTimesOnIntersection = new double[intersectionAbstract2.getConnectionsIn().length+1];
-				amountOfAvg = new int[intersectionAbstract2.getConnectionsIn().length+1];
-			}
-			if(Config.UPDATEAVERAGETIME)
-			{
-				emptyArrayForUser = new double[intersectionAbstract2.getConnectionsIn().length+1];
-				emptyArrayForUserAmountAdded = new int[intersectionAbstract2.getConnectionsIn().length+1];
-			}
-			if(Config.UPDATEMAXTIME)
-			{
-				maxArrayForUser = new double[intersectionAbstract2.getConnectionsIn().length+1];
-				Arrays.fill(maxArrayForUser,-1);
-			}
-			if(Config.UPDATEMINTIME)
-			{
-				minArrayForUser = new double[intersectionAbstract2.getConnectionsIn().length+1];
-				Arrays.fill(minArrayForUser,Double.MAX_VALUE/2);
-			}
-			weightOfRoad = new double[intersectionAbstract2.getConnectionsIn().length+1];
+			averageTimesOnIntersection = new double[intersectionAbstract2.getConnectionsIn( ).length + internalBuffer];
+			amountOfAvg = new int[intersectionAbstract2.getConnectionsIn( ).length + internalBuffer];
 		}
-		else
+		if(Config.UPDATEAVERAGETIME)
 		{
-			if(Config.UPDATEAVERAGETIME)
-			{
-				averageTimesOnIntersection = new double[intersectionAbstract2.getConnectionsIn().length];
-				amountOfAvg = new int[intersectionAbstract2.getConnectionsIn().length];
-			}
-			if(Config.createEmptyArrayForRoad)
-			{
-				emptyArrayForUser = new double[intersectionAbstract2.getConnectionsIn().length];
-				emptyArrayForUserAmountAdded = new int[intersectionAbstract2.getConnectionsIn().length];
-			}
-			if(Config.UPDATEMAXTIME)
-			{
-				maxArrayForUser = new double[intersectionAbstract2.getConnectionsIn().length];
-				Arrays.fill(maxArrayForUser,-1);
-			}
-			if(Config.UPDATEMINTIME)
-			{
-				minArrayForUser = new double[intersectionAbstract2.getConnectionsIn().length];
-				Arrays.fill(minArrayForUser,Double.MAX_VALUE/2);
-			}
-			weightOfRoad = new double[intersectionAbstract2.getConnectionsIn().length];
+			emptyArrayForUser = new double[intersectionAbstract2.getConnectionsIn( ).length + internalBuffer];
+			emptyArrayForUserAmountAdded = new int[intersectionAbstract2.getConnectionsIn( ).length + internalBuffer];
 		}
+		if(Config.UPDATEMAXTIME)
+		{
+			maxArrayForUser = new double[intersectionAbstract2.getConnectionsIn( ).length + internalBuffer];
+			Arrays.fill(maxArrayForUser, - 1);
+		}
+		if(Config.UPDATEMINTIME)
+		{
+			minArrayForUser = new double[intersectionAbstract2.getConnectionsIn( ).length + internalBuffer];
+			Arrays.fill(minArrayForUser, Double.MAX_VALUE / 2);
+		}
+		weightOfRoad = new double[intersectionAbstract2.getConnectionsIn( ).length + internalBuffer];
 		this.setColorOfCarsOnRoad(colorOfCarsOnRoad);
-		differenceX = Math.abs(intersectionAbstract.getxCord() - intersectionAbstract2.getxCord());
-		differenceY = Math.abs(intersectionAbstract.getyCord() - intersectionAbstract2.getyCord());
-		roadRepresentation = edge;
+		differenceX = Math.abs(intersectionAbstract.getxCord( ) - intersectionAbstract2.getxCord( ));
+		differenceY = Math.abs(intersectionAbstract.getyCord( ) - intersectionAbstract2.getyCord( ));
 		goingFrom = intersectionAbstract;
 		goingTo = intersectionAbstract2;
 		this.angleOfRoad = anglesBetweenNodes;
 		this.distanceOfNode = distances;
 		this.MaxSpeedOfCarsOnRoad = speedOfRoads;
-		if (getAngleOfRoad()==-Math.PI)
+		if(getAngleOfRoad( ) == - Math.PI)
 		{
-			spacingX = -Config.SPACINGBETWEENVEHICLES;
+			spacingX = - Config.SPACINGBETWEENVEHICLES;
 			typeOfRoad = 'R';
 		}
-		else if (getAngleOfRoad()>-Math.PI&&getAngleOfRoad()<-Math.PI/2)
+		else if(getAngleOfRoad( ) > - Math.PI && getAngleOfRoad( ) < - Math.PI / 2)
 		{
-			spacingY = -Math.sin(Math.PI+getAngleOfRoad())*Config.SPACINGBETWEENVEHICLES;
-			spacingX = -Math.cos(Math.PI+getAngleOfRoad())*Config.SPACINGBETWEENVEHICLES;
+			spacingY = - Math.sin(Math.PI + getAngleOfRoad( )) * Config.SPACINGBETWEENVEHICLES;
+			spacingX = - Math.cos(Math.PI + getAngleOfRoad( )) * Config.SPACINGBETWEENVEHICLES;
 			typeOfRoad = 'D';
 		}
-		else if (getAngleOfRoad()==-Math.PI/2)
+		else if(getAngleOfRoad( ) == - Math.PI / 2)
 		{
-			spacingY = -Config.SPACINGBETWEENVEHICLES;
+			spacingY = - Config.SPACINGBETWEENVEHICLES;
 			typeOfRoad = 'D';
 		}
-		else if (getAngleOfRoad()>-Math.PI/2&&getAngleOfRoad()<0)
+		else if(getAngleOfRoad( ) > - Math.PI / 2 && getAngleOfRoad( ) < 0)
 		{
-			spacingY = -Math.sin(-getAngleOfRoad())*Config.SPACINGBETWEENVEHICLES;
-			spacingX = Math.cos(-getAngleOfRoad())*Config.SPACINGBETWEENVEHICLES;
+			spacingY = - Math.sin(- getAngleOfRoad( )) * Config.SPACINGBETWEENVEHICLES;
+			spacingX = Math.cos(- getAngleOfRoad( )) * Config.SPACINGBETWEENVEHICLES;
 			typeOfRoad = 'D';
 		}
-		else if (getAngleOfRoad()==0)
+		else if(getAngleOfRoad( ) == 0)
 		{
 			spacingX = Config.SPACINGBETWEENVEHICLES;
 			typeOfRoad = 'L';
 		}
-		else if (getAngleOfRoad()>0&&getAngleOfRoad()<Math.PI/2)
+		else if(getAngleOfRoad( ) > 0 && getAngleOfRoad( ) < Math.PI / 2)
 		{
-			spacingY = Math.sin(getAngleOfRoad())*Config.SPACINGBETWEENVEHICLES;
-			spacingX = Math.cos(getAngleOfRoad())*Config.SPACINGBETWEENVEHICLES;
+			spacingY = Math.sin(getAngleOfRoad( )) * Config.SPACINGBETWEENVEHICLES;
+			spacingX = Math.cos(getAngleOfRoad( )) * Config.SPACINGBETWEENVEHICLES;
 			typeOfRoad = 'U';
 		}
-		else if (getAngleOfRoad()==Math.PI/2)
+		else if(getAngleOfRoad( ) == Math.PI / 2)
 		{
 			spacingY = Config.SPACINGBETWEENVEHICLES;
 			typeOfRoad = 'U';
 		}
-		else if (getAngleOfRoad()>Math.PI/2&&getAngleOfRoad()<Math.PI)
+		else if(getAngleOfRoad( ) > Math.PI / 2 && getAngleOfRoad( ) < Math.PI)
 		{
-			spacingY = Math.sin(Math.PI-getAngleOfRoad())*Config.SPACINGBETWEENVEHICLES;
-			spacingX = -Math.cos(Math.PI-getAngleOfRoad())*Config.SPACINGBETWEENVEHICLES;
+			spacingY = Math.sin(Math.PI - getAngleOfRoad( )) * Config.SPACINGBETWEENVEHICLES;
+			spacingX = - Math.cos(Math.PI - getAngleOfRoad( )) * Config.SPACINGBETWEENVEHICLES;
 			typeOfRoad = 'U';
 		}
-		else if (getAngleOfRoad()==Math.PI)
+		else if(getAngleOfRoad( ) == Math.PI)
 		{
-			spacingX = -Config.SPACINGBETWEENVEHICLES;
+			spacingX = - Config.SPACINGBETWEENVEHICLES;
 			typeOfRoad = 'R';
 		}
 	}
 	
-	
 	public double hasSpace()
 	{
-		if(getCarsOnRoad().size()>0)
+		if(getCarsOnRoad( ).size( ) > 0)
 		{
-			if(Util.isOnLineCars(
-					getCarsOnRoad().get(getCarsOnRoad().size()-1).getCurrentX()+getSpacingX(), 
-					getCarsOnRoad().get(getCarsOnRoad().size()-1).getCurrentY()+getSpacingY(),
-					getGoingFrom().getxCord(),getGoingFrom().getyCord(),
-					getGoingTo().getxCord(),getGoingTo().getyCord()))
+			if(Util.isOnLineCars(getCarsOnRoad( ).get(getCarsOnRoad( ).size( ) - 1).getCurrentX( ) + getSpacingX( ), getCarsOnRoad( ).get(getCarsOnRoad( ).size( ) - 1).getCurrentY( ) + getSpacingY( ), getGoingFrom( ).getxCord( ), getGoingFrom( ).getyCord( ), getGoingTo( ).getxCord( ), getGoingTo( ).getyCord( )))
 			{
-				double finalCarsValueX = getCarsOnRoad().get(getCarsOnRoad().size()-1).getCurrentX()+getSpacingX();
-				double finalCarsValueY = getCarsOnRoad().get(getCarsOnRoad().size()-1).getCurrentY()+getSpacingY();
-				double spaceOnNextRoad = Math.sqrt(((finalCarsValueX-this.getGoingFrom().getxCord())*(finalCarsValueX-this.getGoingFrom().getxCord()))+((finalCarsValueY-this.getGoingFrom().getyCord())*(finalCarsValueY-this.getGoingFrom().getyCord())));
-				return spaceOnNextRoad;
+				double finalCarsValueX = getCarsOnRoad( ).get(getCarsOnRoad( ).size( ) - 1).getCurrentX( ) + getSpacingX( );
+				double finalCarsValueY = getCarsOnRoad( ).get(getCarsOnRoad( ).size( ) - 1).getCurrentY( ) + getSpacingY( );
+				return Math.sqrt(((finalCarsValueX - this.getGoingFrom( ).getxCord( )) * (finalCarsValueX - this.getGoingFrom( ).getxCord( ))) + ((finalCarsValueY - this.getGoingFrom( ).getyCord( )) * (finalCarsValueY - this.getGoingFrom( ).getyCord( ))));
 			}
 			else
 			{
@@ -168,162 +137,131 @@ public class Road
 		int index = 0;
 		boolean activation = true;
 		boolean shouldNotBeActivated = false;
-		if (carsOnRoad.size() >= 1)
+		if(carsOnRoad.size( ) >= 1)
 		{
-			if (typeOfRoad=='L')
+			if(typeOfRoad == 'L')
 			{
-				for (int i = 0; i < carsOnRoad.size(); i++)
+				for(int i = 0; i < carsOnRoad.size( ); i++)
 				{
 					index = i;
-					if (carsOnRoad.get(i).getCurrentX() > startRoad.xCord)
+					if(carsOnRoad.get(i).getCurrentX( ) > startRoad.xCord)
 					{
 						activation = false;
-						if(carsOnRoad.get(i).canCarStopInTime(startRoad.xCord, startRoad.yCord,carSprite)==true)
+						if(carsOnRoad.get(i).canCarStopInTime(startRoad.xCord, startRoad.yCord))
 						{
-							if(shouldNotBeActivated==false)
+							if(! shouldNotBeActivated)
 								activation = true;
 							break;
 						}
-						shouldNotBeActivated=true;
+						shouldNotBeActivated = true;
 					}
 					index = i + 1;
 				}
 			}
-			else if (typeOfRoad=='R')
+			else if(typeOfRoad == 'R')
 			{
 				
-				for (int i = 0; i < carsOnRoad.size(); i++)
+				for(int i = 0; i < carsOnRoad.size( ); i++)
 				{
 					index = i;
-					if (carsOnRoad.get(i).getCurrentX() < startRoad.xCord)
+					if(carsOnRoad.get(i).getCurrentX( ) < startRoad.xCord)
 					{
 						activation = false;
-						if(carsOnRoad.get(i).canCarStopInTime(startRoad.xCord, startRoad.yCord,carSprite)==true)
+						if(carsOnRoad.get(i).canCarStopInTime(startRoad.xCord, startRoad.yCord))
 						{
-							if(shouldNotBeActivated==false)
+							if(! shouldNotBeActivated)
 								activation = true;
 							break;
 						}
-						shouldNotBeActivated=true;
+						shouldNotBeActivated = true;
 					}
 					index = i + 1;
 				}
 			}
-			else if (typeOfRoad=='U')
+			else if(typeOfRoad == 'U')
 			{
-				for (int i = 0; i < carsOnRoad.size(); i++)
+				for(int i = 0; i < carsOnRoad.size( ); i++)
 				{
-					if(carSprite.getId().equals("191"))
-					{
-						//System.out.println("here");
-					}
 					index = i;
-					if (carsOnRoad.get(i).getCurrentY() > startRoad.yCord)
+					if(carsOnRoad.get(i).getCurrentY( ) > startRoad.yCord)
 					{
-						if(carSprite.getId().equals("191"))
-						{
-							System.out.println("here");
-						}
 						activation = false;
-						if(carsOnRoad.get(i).canCarStopInTime(startRoad.xCord, startRoad.yCord,carSprite)==true)
+						if(carsOnRoad.get(i).canCarStopInTime(startRoad.xCord, startRoad.yCord))
 						{
-							if(shouldNotBeActivated==false)
+							if(! shouldNotBeActivated)
 								activation = true;
 							break;
 						}
-						shouldNotBeActivated=true;
+						shouldNotBeActivated = true;
 					}
 					index = i + 1;
 				}
 			}
-			else if (typeOfRoad=='D')
+			else if(typeOfRoad == 'D')
 			{
-				for (int i = 0; i < carsOnRoad.size(); i++)
+				for(int i = 0; i < carsOnRoad.size( ); i++)
 				{
 					index = i;
-					if (carsOnRoad.get(i).getCurrentY() < startRoad.yCord)
+					if(carsOnRoad.get(i).getCurrentY( ) < startRoad.yCord)
 					{
 						activation = false;
-						if(carsOnRoad.get(i).canCarStopInTime(startRoad.xCord, startRoad.yCord,carSprite)==true)
+						if(carsOnRoad.get(i).canCarStopInTime(startRoad.xCord, startRoad.yCord))
 						{
-							if(shouldNotBeActivated==false)
+							if(! shouldNotBeActivated)
 								activation = true;
 							break;
 						}
-						shouldNotBeActivated=true;
+						shouldNotBeActivated = true;
 					}
 					index = i + 1;
 				}
 			}
-		}
-		if(activation == false)
-		{
-			//System.out.println("gotone");
 		}
 		Car tempCar = new Car(startRoad.xCord, startRoad.yCord, this, endRoad, activation, fuelChoice, carSprite);
 		carsOnRoad.add(index, tempCar);
 		return tempCar;
 	}
 	
-	
-	public double[] percentLine(double firstX, double secondX, double firstY, double secondY, int percent)
+	private double[] percentLine(double firstX, double secondX, double firstY, double secondY, int percent)
 	{
-		double percentDoub = (double) (100-percent) / 100.0;
-		return (new double[]
-		{ (secondX + (percentDoub * (firstX - secondX))), (secondY + (percentDoub * (firstY - secondY))) });
+		double percentDoub = (double) (100 - percent) / 100.0;
+		return (new double[]{(secondX + (percentDoub * (firstX - secondX))), (secondY + (percentDoub * (firstY - secondY)))});
 	}
 	
 	public PointOnRoad getPointOnRoad(int percentOfRoad)
 	{
-		double[] point = percentLine(goingFrom.getxCord(), goingTo.getxCord(), goingFrom.getyCord(), goingTo.getyCord(), percentOfRoad);
+		double[] point = percentLine(goingFrom.getxCord( ), goingTo.getxCord( ), goingFrom.getyCord( ), goingTo.getyCord( ), percentOfRoad);
 		return (new PointOnRoad(this, point[0], point[1]));
 	}
 	
-	public boolean hasCarWithinSeconds(double time)
+	public boolean hasCarWithinSeconds(double time, boolean hasCarMoved)
 	{
-		if(carsOnRoad.size()==0)
+		if(carsOnRoad.size( ) == 0)
 		{
 			return false;
 		}
 		else
 		{
 			Car frontMostCar = carsOnRoad.get(0);
-			if(frontMostCar.isHasMoved())
+			if(hasCarMoved)
 			{
-				time = time+1;
+				time = time + 1;
 			}
-			double endSpeed = frontMostCar.getCurrentSpeed()+(frontMostCar.getAcceleration()*(time));
-			double distanceTravelled = 0;
-			if(endSpeed>MaxSpeedOfCarsOnRoad)
+			double endSpeed = frontMostCar.getCurrentSpeed( ) + (Config.CARACCELERATIONANDDECELERATION * (time));
+			double distanceTravelled;
+			if(endSpeed > MaxSpeedOfCarsOnRoad)
 			{
-				double timeTakenToGetMaxSpeed = (MaxSpeedOfCarsOnRoad - frontMostCar.getCurrentSpeed())/frontMostCar.getAcceleration();
-				distanceTravelled=((frontMostCar.getCurrentSpeed()+MaxSpeedOfCarsOnRoad)*0.5*timeTakenToGetMaxSpeed)+((MaxSpeedOfCarsOnRoad)*((time)-timeTakenToGetMaxSpeed));
-			}
-			else
-			{
-				distanceTravelled=((frontMostCar.getCurrentSpeed()+endSpeed)*0.5*(time));
-			}
-			if(distanceTravelled>Util.getLengthOfLine(frontMostCar.getCurrentX(), frontMostCar.getCurrentY(), goingTo.getxCord(), goingTo.getyCord()))
-			{
-				return true;
+				double timeTakenToGetMaxSpeed = (MaxSpeedOfCarsOnRoad - frontMostCar.getCurrentSpeed( )) / Config.CARACCELERATIONANDDECELERATION;
+				distanceTravelled = ((frontMostCar.getCurrentSpeed( ) + MaxSpeedOfCarsOnRoad) * 0.5 * timeTakenToGetMaxSpeed) + ((MaxSpeedOfCarsOnRoad) * ((time) - timeTakenToGetMaxSpeed));
 			}
 			else
 			{
-				return false;
+				distanceTravelled = ((frontMostCar.getCurrentSpeed( ) + endSpeed) * 0.5 * (time));
 			}
+			return distanceTravelled > Util.getLengthOfLine(frontMostCar.getCurrentX( ), frontMostCar.getCurrentY( ), goingTo.getxCord( ), goingTo.getyCord( ));
 		}
 	}
-
-	public IntersectionAbstract getTo()
-	{
-		return getGoingTo();
-	}
-
-	public IntersectionAbstract getFrom()
-	{
-		return getGoingFrom();
-	}
-
+	
 	public double getDistance()
 	{
 		return distanceOfNode;
@@ -331,92 +269,99 @@ public class Road
 	
 	public void removeFrom(Car car)
 	{
-		getCarsOnRoad().remove(car);
-	}
-
-	public Road addTo(Car car)
-	{
-		getCarsOnRoad().add(car);
-		return this;
+		getCarsOnRoad( ).remove(car);
 	}
 	
-	public char getTypeOfRoad() {
+	public void addTo(Car car)
+	{
+		getCarsOnRoad( ).add(car);
+	}
+	
+	public char getTypeOfRoad()
+	{
 		return typeOfRoad;
 	}
-
-	public LinkedList<Car> getCarsOnRoad() {
+	
+	public LinkedList<Car> getCarsOnRoad()
+	{
 		return carsOnRoad;
 	}
-
-	public double getSpacingX() {
+	
+	public double getSpacingX()
+	{
 		return spacingX;
 	}
-
-	public double getSpacingY() {
+	
+	public double getSpacingY()
+	{
 		return spacingY;
 	}
 	
-	public IntersectionAbstract getGoingFrom() {
+	public IntersectionAbstract getGoingFrom()
+	{
 		return goingFrom;
 	}
 	
-	public IntersectionAbstract getGoingTo() {
+	public IntersectionAbstract getGoingTo()
+	{
 		return goingTo;
 	}
-
-
-	public double getAngleOfRoad() {
+	
+	public double getAngleOfRoad()
+	{
 		return angleOfRoad;
 	}
-
-
-	public double getMaxSpeedOfCarsOnRoad() {
+	
+	public double getMaxSpeedOfCarsOnRoad()
+	{
 		return MaxSpeedOfCarsOnRoad;
 	}
 	
-	public double getDiffX() {
+	public double getDiffX()
+	{
 		return differenceX;
 	}
 	
-	public double getDiffY() {
+	public double getDiffY()
+	{
 		return differenceY;
 	}
-
-
-	public char getColorOfCarsOnRoad() {
+	
+	public char getColorOfCarsOnRoad()
+	{
 		return colorOfCarsOnRoad;
 	}
-
-
-	public void setColorOfCarsOnRoad(char colorOfCarsOnRoad) {
+	
+	private void setColorOfCarsOnRoad(char colorOfCarsOnRoad)
+	{
 		this.colorOfCarsOnRoad = colorOfCarsOnRoad;
 	}
-
-
-	public double[] getWeightOfRoad() {
+	
+	public double[] getWeightOfRoad()
+	{
 		return weightOfRoad;
 	}
-
-
-	public void setWeightOfRoad(double[] weightOfRoad) {
-		this.weightOfRoad = weightOfRoad;
-	}
 	
-
-	public double[] getAverageTimesOnIntersection() {
+	public double[] getAverageTimesOnIntersection()
+	{
 		return averageTimesOnIntersection;
 	}
-
-
-	public void setAverageTimesOnIntersection(double[] averageTimesOnIntersection) {
-		this.averageTimesOnIntersection = averageTimesOnIntersection;
-	}
-
-
-	public int[] getAmountOfAvg() {
+	
+	public int[] getAmountOfAvg()
+	{
 		return amountOfAvg;
 	}
-
-
-
+	
+	@Override
+	public int compareTo(Road o)
+	{
+		if(getAngleOfRoad( ) < o.getAngleOfRoad( ))
+		{
+			return 1;
+		}
+		else
+		{
+			return - 1;
+		}
+	}
 }
