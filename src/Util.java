@@ -1,5 +1,3 @@
-package com.company.Other;
-
 import java.awt.geom.Line2D;
 
 public class Util

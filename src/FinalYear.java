@@ -1,6 +1,4 @@
-package com.company.Other;
 
-import com.company.Intersections.*;
 import org.graphstream.graph.Edge;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;

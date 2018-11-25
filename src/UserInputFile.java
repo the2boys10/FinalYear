@@ -1,11 +1,5 @@
-package com.company.Other;
 
-import com.company.HelperObjects.RoadAndWeight;
-import com.company.SearchMethods.*;
-
-import java.util.LinkedList;
 import java.util.Random;
-import java.util.TreeSet;
 
 public class UserInputFile
 {

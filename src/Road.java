@@ -1,11 +1,7 @@
-package com.company.Other;
 
-import com.company.HelperObjects.PointOnRoad;
-import com.company.Intersections.IntersectionAbstract;
 import org.graphstream.ui.spriteManager.Sprite;
 
 import java.util.Arrays;
-import java.util.LinkedList;
 
 public class Road implements Comparable<Road>
 {

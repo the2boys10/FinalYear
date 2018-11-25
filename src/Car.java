@@ -1,9 +1,4 @@
-package com.company.Other;
 
-import com.company.HelperObjects.GoalAndDistance;
-import com.company.HelperObjects.PointOnRoad;
-import com.company.Intersections.CrossRoads;
-import com.company.Intersections.Tjunction;
 import org.graphstream.ui.spriteManager.Sprite;
 
 public class Car

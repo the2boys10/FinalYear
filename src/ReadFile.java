@@ -1,4 +1,3 @@
-package com.company.Other;
 
 import java.io.BufferedReader;
 import java.io.FileReader;

@@ -1,4 +1,3 @@
-package com.company.Other;
 
 import java.io.File;
 import java.io.FileWriter;
