@@ -2,7 +2,7 @@
 import java.util.LinkedList;
 import java.util.TreeSet;
 
-public class ActualWaitingTime extends SearchTechniques
+public class ActualWaitingTime extends BFSearch
 {
 	
 	@Override

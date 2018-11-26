@@ -1,5 +1,6 @@
 
-public class WeightsOnEdgesAndIntersections extends SearchTechniques
+
+public class WeightsOnEdgesAndIntersections extends BFSearch
 {
 	@Override
 	public void determineWeightOfRoadInitial(double[] passWeights, Road road)

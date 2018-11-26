@@ -1,5 +1,5 @@
 
-public class Dijstra extends SearchTechniques
+public class Dijstra extends BFSearch
 {
 	@Override
 	public void determineWeightOfRoadInitial(double[] passWeights, Road road)

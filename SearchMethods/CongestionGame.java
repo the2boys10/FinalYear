@@ -1,5 +1,5 @@
 
-public class CongestionGame extends SearchTechniques
+public class CongestionGame extends BFSearch
 {
 	@Override
 	public void determineWeightOfRoadInitial(double[] passWeights, Road road)

@@ -1,5 +1,6 @@
 
-public class AddingAndTakingAway extends SearchTechniques
+
+public class AddingAndTakingAway extends BFSearch
 {
 	@Override
 	public void determineWeightOfRoadInitial(double[] passWeights, Road road)

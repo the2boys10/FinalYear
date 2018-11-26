@@ -2,7 +2,7 @@
 import java.util.LinkedList;
 import java.util.TreeSet;
 
-public class AvgSoFar extends SearchTechniques
+public class AvgSoFar extends BFSearch
 {
 	@Override
 	public void selectWeightStrategyInit(Road callingRoad, LinkedList<Road> a, TreeSet<RoadAndWeight> b, LinkedList<Road> c, Road endRoad)
