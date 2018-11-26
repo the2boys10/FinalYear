@@ -1,6 +1,15 @@
-
 import org.graphstream.ui.spriteManager.Sprite;
 
+
+/**
+ * This class consists information relating to the vehicles within the simulation
+ * containing where their goal is within the simulation as well as their current location
+ * and speed perameters.
+ *
+ * @author Robert Johnson
+ * @see PointOnRoad
+ * @see FuelDependancies
+ */
 public class Car
 {
 	private static boolean anyChange = false;
@@ -26,6 +35,19 @@ public class Car
 	private double timeTakenToPassIntersectionPrevious = 0;
 	private final FuelDependancies fuelDependant;
 	
+	/**
+	 * Constructor to create a car
+	 * @param xCord The starting x Cord of the vehicle
+	 * @param yCord The starting y Cord of the vehicle
+	 * @param road The starting road of the vehicle
+	 * @param endRoad The goal of the vehicle (Where it would like to end up)
+	 * @param activation Whether the care has been activated upon placing it on a road
+	 *                   this could be false if the vehicle behind the current vehicle is
+	 *                   unable to slow down in time.
+	 * @param fuelChoice The fuel choice of the vehicle, can take values of 0,1,2 increasing the fuel
+	 *                   usage used by a factor of 10
+	 * @param carSprite The physical representation of the car in the simulation.
+	 */
 	public Car(double xCord, double yCord, Road road, PointOnRoad endRoad, boolean activation, int fuelChoice, Sprite carSprite)
 	{
 		if(road.getColorOfCarsOnRoad( ) == 'R')
@@ -45,6 +67,14 @@ public class Car
 		this.activated = activation;
 	}
 	
+	/**
+	 * Method which takes the information of another car within the simulation and verifies that the current car
+	 * is able to slow down to avoid a collision i.e such a method can be useful when inserting a car into the
+	 * simulation.
+	 * @param xCord The xCord of the vehicle we are comparing against
+	 * @param yCord The yCord of the vehicle we are comparing against
+	 * @return Whether the car in question is able to slow down quick enough such that a collision does not happen.
+	 */
 	public boolean canCarStopInTime(double xCord, double yCord)
 	{
 		double timeTakenToSlowToStop = - currentSpeed / - Config.CARACCELERATIONANDDECELERATION;
@@ -52,6 +82,13 @@ public class Car
 		return Util.getLengthOfLine(currentX, currentY, xCord, yCord) > distanceThatWillPassSlowingDown;
 	}
 	
+	/**
+	 * Method to work out what the current goal is, the goal can take 3 perameters "Goal" in which case the vehicle we are looking
+	 * at is on the road that contains its goal, "EOCR" in which care the goal is not on the current road and the car is
+	 * the front most car in a road, "CIF" the car is following another car on the same road as itself. It also returns
+	 * the distance left to the goal and the actual distance to the goal.
+	 * @return A goal object discribing the current goal and the distance to it.
+	 */
 	private GoalAndDistance workoutGoal()
 	{
 		GoalAndDistance currentGoal = new GoalAndDistance( );
@@ -92,12 +129,22 @@ public class Car
 		return currentGoal;
 	}
 	
+	/**
+	 * Method to move a car within the simulation if possible, else it keeps the vehicle in the same place.
+	 * @param forceFuel If the vehicle was unable to move throughout the current timestep however we would like to
+	 *                  penalise it due to not moving then we can force the fuel usage for the timestep
+	 * @return A string representing if the car was unable to move "Failed to Move", moved "UsedUpTurn" or reached
+	 * its goal "Finished"
+	 */
 	public String moveCar(boolean forceFuel)
 	{
+		// if the car hasn't moved in the current timestep
 		if(! hasMoved)
 		{
+			// if the car has been activated
 			if(activated)
 			{
+				// work out the current goal and whether we can stop in time to make it to the goal
 				GoalAndDistance goal = workoutGoal( );
 				double v = currentSpeed + Config.CARACCELERATIONANDDECELERATION * Config.SIMACCELERATION;
 				double time = (0 - v) / - Config.CARACCELERATIONANDDECELERATION;
@@ -115,12 +162,15 @@ public class Car
 				double distance2 = (currentSpeed * Config.SIMACCELERATION) + currentSpeed * time2 + 0.5 * - Config.CARACCELERATIONANDDECELERATION * time2 * time2;
 				double distanceToMove = 0;
 				double oldspeed = currentSpeed;
+				// if slowing down in the current timestep would cause us to go into a negative speed i.e reverse set it to 0.
 				if(currentSpeed - (Config.CARACCELERATIONANDDECELERATION * Config.SIMACCELERATION) < 0 && currentSpeed != 0)
 				{
 					currentSpeed = 0;
 				}
 				else
 				{
+					// if travelling the distance we would travel accelerating would be less than the distance we have left
+					// then accelerate
 					if(Double.compare(goal.getDistanceLeft( ), distance) >= 0)
 					{
 						currentSpeed = oldspeed + (Config.CARACCELERATIONANDDECELERATION * Config.SIMACCELERATION);
@@ -137,11 +187,14 @@ public class Car
 						}
 						distanceToMove = 0.5 * (oldspeed + currentSpeed) * Config.SIMACCELERATION;
 					}
+					// else if if travelling at the same speed would be less than the distance we have left continue at
+					// current speed
 					else if(Double.compare(goal.getDistanceLeft( ), distance2) >= 0)
 					{
 						currentSpeed = oldspeed;
 						distanceToMove = currentSpeed * Config.SIMACCELERATION;
 					}
+					// else slow down.
 					else
 					{
 						currentSpeed = oldspeed + (- Config.CARACCELERATIONANDDECELERATION) * Config.SIMACCELERATION;
@@ -152,6 +205,7 @@ public class Car
 						distanceToMove = 0.5 * (oldspeed + currentSpeed) * Config.SIMACCELERATION;
 					}
 				}
+				// make sure the spacing to the car infront is maintained.
 				if(goal.getDistanceLeft( ) < Config.CARACCELERATIONANDDECELERATION && currentSpeed == 0 && goal.getDistanceLeft( ) != 0)
 				{
 					switch(goal.getGoal( ))
@@ -173,6 +227,7 @@ public class Car
 					goal.setDistanceLeft(0);
 					distanceToMove = 0;
 				}
+				// make the move.
 				if(goal.getActualDistanceLeft( ) <= distanceToMove)
 				{
 					switch(goal.getGoal( ))
@@ -203,6 +258,7 @@ public class Car
 					return updateCarLocationAndFuel(oldspeed, distanceToMove);
 				}
 			}
+			// else the vehicle did not move, check the reasoning for this and update fuel ect.
 			else
 			{
 				hasMoved = true;
@@ -224,6 +280,14 @@ public class Car
 		return "UsedUpTurn";
 	}
 	
+	/**
+	 * Method used to update the cars location and fuel usage after moving.
+	 * @param forceFuel If we would like to force fuel usage in the case that the car was unable to move previously.
+	 * @param oldspeed The old speed of the vehicle
+	 * @param distanceToGo The distance that the car needs to move.
+	 * @return A string representing if the car was able to move "UsedUpTurn", reached its goal "Finished" or failed to move
+	 * "Failed to Move"
+	 */
 	private String updateCarsPositionAndFuelBothCases(boolean forceFuel, double oldspeed, double distanceToGo)
 	{
 		currentX = currentRoad.getGoingTo( ).getxCord( );
@@ -238,7 +302,14 @@ public class Car
 		}
 	}
 	
-	
+	/**
+	 * Method used to force fuel if the intersection in question allows multiple different decisions about exiting the
+	 * intersection set a cap for reconsideration of route
+	 * @param forceFuel If we would like to force fuel usage in the case that the car was unable to move previously.
+	 * @param oldspeed The old speed of the vehicle.
+	 * @return A string representing if the car was able to move "UsedUpTurn", reached its goal "Finished" or failed to move
+	 * "Failed to Move"
+	 */
 	private String forceFuelGeneric(boolean forceFuel, double oldspeed)
 	{
 		if(forceFuel)
@@ -257,7 +328,13 @@ public class Car
 		return "Failed to Move";
 	}
 	
-	
+	/**
+	 * Method used to move a vehicle in the case that it is able to successfully.
+	 * @param oldspeed The old speed of the vehicle
+	 * @param distanceToGo The distance that the car needs to move.
+	 * @return A string representing if the car was able to move "UsedUpTurn", reached its goal "Finished" or failed to move
+	 * "Failed to Move"
+	 */
 	private String updateCarLocationAndFuel(double oldspeed, double distanceToGo)
 	{
 		endOfTurnActivities(oldspeed, currentSpeed);
@@ -267,6 +344,13 @@ public class Car
 		return "UsedUpTurn";
 	}
 	
+	/**
+	 * In the case where the vehicle was able to move, the car should reconsider their next road to take.
+	 * @param oldspeed The old speed of the vehicle
+	 * @param distanceToGo The distance that the car needs to move.
+	 * @return A string representing if the car was able to move "UsedUpTurn", reached its goal "Finished" or failed to move
+	 * "Failed to Move"
+	 */
 	private String updateCarsPositionAndFuel(double oldspeed, double distanceToGo)
 	{
 		nextRoad = null;
@@ -274,6 +358,10 @@ public class Car
 	}
 	
 	
+	/**
+	 * Check how many failed attempts the current car has had at the current intersection and make it rechoose the road
+	 * if it has been there past a threshold.
+	 */
 	private void verifyFailedAmount()
 	{
 		if((currentRoad.getGoingTo( ).getClass( ).equals(Tjunction.class) && failedAmount > Config.TJUNCTIONRECHOOSEAMOUNT) || (currentRoad.getGoingTo( ).getClass( ).equals(CrossRoads.class) && failedAmount > Config.CROSSROADSRECHOOSEAMOUNT))
@@ -283,6 +371,10 @@ public class Car
 		}
 	}
 	
+	/**
+	 * Move the car in the simulation the stated distance
+	 * @param distanceToGo The distance to move the car.
+	 */
 	private void moveCarXandY(double distanceToGo)
 	{
 		if(currentRoad.getDiffX( ) == 0)
@@ -318,6 +410,10 @@ public class Car
 		hasMoved = true;
 	}
 	
+	/**
+	 * Method is used to update weights on roads in a dynamic system where weights are updated on the fly based upon
+	 * previous time waiting at an intersection or travelling on a road.
+	 */
 	private void updateTimeOnRoads()
 	{
 		if(readingOfCurrentRoad && ! atIntersection)
@@ -367,6 +463,11 @@ public class Car
 		}
 	}
 	
+	/**
+	 * Update the time waiting on a road or at an intersection and calulates,updates the cars own FuelDependancies object
+	 * @param oldSpeed The speed of the vehicle at the start of the timestep
+	 * @param currentSpeed The speed of the vehicle at the end of the timestep
+	 */
 	public void endOfTurnActivities(double oldSpeed, double currentSpeed)
 	{
 		updateTimeOnRoads( );
@@ -453,7 +554,10 @@ public class Car
 		return ! hasAddedToRoadAverage;
 	}
 	
-	public void setHasAddedToRoadAverage(boolean hasAddedToRoadAverage) { this.hasAddedToRoadAverage = hasAddedToRoadAverage; }
+	public void setHasAddedToRoadAverage(boolean hasAddedToRoadAverage)
+	{
+		this.hasAddedToRoadAverage = hasAddedToRoadAverage;
+	}
 	
 	public static void setAnyChange(boolean anyChange)
 	{
@@ -480,18 +584,30 @@ public class Car
 		return timeTakenToTravelDownRoad;
 	}
 	
-	public void setTimeTakenToTravelDownRoad(int timeTakenToTravelDownRoad) { this.timeTakenToTravelDownRoad = timeTakenToTravelDownRoad; }
+	public void setTimeTakenToTravelDownRoad(int timeTakenToTravelDownRoad)
+	{
+		this.timeTakenToTravelDownRoad = timeTakenToTravelDownRoad;
+	}
 	
 	public int getTimeWaitingAtIntersection()
 	{
 		return timeWaitingAtIntersection;
 	}
 	
-	public void setTimeWaitingAtIntersection(int timeWaitingAtIntersection) { this.timeWaitingAtIntersection = timeWaitingAtIntersection; }
+	public void setTimeWaitingAtIntersection(int timeWaitingAtIntersection)
+	{
+		this.timeWaitingAtIntersection = timeWaitingAtIntersection;
+	}
 	
-	public void setTimeTakenToTravelDownRoadPrevious(double timeTakenToTravelDownRoadPrevious) { this.timeTakenToTravelDownRoadPrevious = timeTakenToTravelDownRoadPrevious; }
+	public void setTimeTakenToTravelDownRoadPrevious(double timeTakenToTravelDownRoadPrevious)
+	{
+		this.timeTakenToTravelDownRoadPrevious = timeTakenToTravelDownRoadPrevious;
+	}
 	
-	public void setTimeTakenToPassIntersectionPrevious(double timeTakenToPassIntersectionPrevious) { this.timeTakenToPassIntersectionPrevious = timeTakenToPassIntersectionPrevious; }
+	public void setTimeTakenToPassIntersectionPrevious(double timeTakenToPassIntersectionPrevious)
+	{
+		this.timeTakenToPassIntersectionPrevious = timeTakenToPassIntersectionPrevious;
+	}
 	
 	public boolean isReadingOfCurrentRoad()
 	{
